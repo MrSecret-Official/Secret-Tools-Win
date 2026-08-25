@@ -282,7 +282,7 @@ if ($needsDownload) {
 }
 
 # Root launcher forwarder with mandatory Admin auto-elevation
-$rootForwarderContent = "@echo off`nsetlocal EnableDelayedExpansion`nnet session >nul 2>&1`nif %errorlevel% neq 0 (`n    powershell -NoProfile -ExecutionPolicy Bypass -Command `"Start-Process -FilePath '%~f0' -ArgumentList '%*' -Verb RunAs`"`n    exit /b 0`n)`nset `"SD=%~dp0`"`nif exist `"%SD%Tools\secret-tools.bat`" (`n    call `"%SD%Tools\secret-tools.bat`" %*`n) else (`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n)`nexit /b %errorlevel%"
+$rootForwarderContent = "@echo off`nsetlocal EnableDelayedExpansion`nnet session >nul 2>&1`nif %errorlevel% neq 0 (`n    powershell -NoProfile -ExecutionPolicy Bypass -Command `"Start-Process -FilePath '%~f0' -Verb RunAs`"`n    exit /b 0`n)`nset `"SD=%~dp0`"`nif exist `"%SD%Tools\secret-tools.bat`" (`n    call `"%SD%Tools\secret-tools.bat`" %*`n) else (`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n)`nexit /b %errorlevel%"
 Set-Content -Path $rootLauncher -Value $rootForwarderContent -Force
 
 # Register in User PATH
