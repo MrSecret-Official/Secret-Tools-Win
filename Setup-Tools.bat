@@ -281,8 +281,8 @@ if ($needsDownload) {
     Write-Host "${creamyGreen}[OK] Components already deployed and verified.${reset}"
 }
 
-# Root launcher forwarder
-$rootForwarderContent = "@echo off`nsetlocal`nset `"SD=%~dp0`"`nif exist `"%SD%Tools\secret-tools.bat`" (`n    call `"%SD%Tools\secret-tools.bat`" %*`n) else (`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n)`nexit /b %errorlevel%"
+# Root launcher forwarder with mandatory Admin auto-elevation
+$rootForwarderContent = "@echo off`nsetlocal EnableDelayedExpansion`nnet session >nul 2>&1`nif %errorlevel% neq 0 (`n    powershell -NoProfile -ExecutionPolicy Bypass -Command `"Start-Process -FilePath '%~f0' -ArgumentList '%*' -Verb RunAs`"`n    exit /b 0`n)`nset `"SD=%~dp0`"`nif exist `"%SD%Tools\secret-tools.bat`" (`n    call `"%SD%Tools\secret-tools.bat`" %*`n) else (`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n)`nexit /b %errorlevel%"
 Set-Content -Path $rootLauncher -Value $rootForwarderContent -Force
 
 # Register in User PATH
@@ -299,15 +299,32 @@ if ($pathUpdated) {
     Write-Host "${creamyGreen}[OK] Added to User PATH (command: secret-tools).${reset}"
 }
 
-# Desktop shortcut
+# Desktop shortcut with mandatory Run As Administrator Flag
 $ws = New-Object -ComObject WScript.Shell
 $desktop = [Environment]::GetFolderPath('Desktop')
-$shortcut = $ws.CreateShortcut("$desktop\Secret-Tools.lnk")
+$shortcutPath = "$desktop\Secret-Tools.lnk"
+$shortcut = $ws.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $mainBat
 $shortcut.WorkingDirectory = $toolsDir
-$shortcut.Description = 'Secret-Tools Management Panel'
+$shortcut.Description = 'Secret-Tools Management and Repair Panel'
 $shortcut.Save()
-Write-Host "${creamyGreen}[OK] Desktop shortcut verified.${reset}"
+
+# Set Run as Administrator byte in shortcut file
+try {
+    $lnkBytes = [System.IO.File]::ReadAllBytes($shortcutPath)
+    $lnkBytes[0x15] = $lnkBytes[0x15] -bor 0x20
+    [System.IO.File]::WriteAllBytes($shortcutPath, $lnkBytes)
+} catch {}
+
+# Register Windows AppCompatFlags to ensure Secret-Tools always runs as Admin
+try {
+    $regKey = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
+    if (-not (Test-Path $regKey)) { New-Item -Path $regKey -Force | Out-Null }
+    Set-ItemProperty -Path $regKey -Name $mainBat -Value "~ RUNASADMIN" -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path $regKey -Name $rootLauncher -Value "~ RUNASADMIN" -Force -ErrorAction SilentlyContinue
+} catch {}
+
+Write-Host "${creamyGreen}[OK] Desktop shortcut & Administrator execution policies configured.${reset}"
 
 # -------------------------------------------------------------
 # STEP 4: FORMAL WELCOME & FINISH
