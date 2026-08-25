@@ -1,145 +1,175 @@
 # password_manager.ps1
-# Multi-user password management - Secure Remote Authentication
-
-param(
-    [string]$Username = "",
-    [string]$InputPassword = "",
-    [string]$Action = "verify"
-)
+# Secret-Tools : Secure Authentication & Verification Workflow
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$Config = @{
-    "Secret-user" = @{
-        ApiUrl    = "https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/Sec-User-Pass.txt"
-        CacheFile = "$PSScriptRoot\..\cache\secret_user.cache"
+$esc = [char]27
+$creamyGreen = "$esc[38;2;145;225;165m"
+$creamyRed   = "$esc[38;2;235;120;120m"
+$creamyCyan  = "$esc[38;2;130;210;245m"
+$reset       = "$esc[0m"
+
+$scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$userProfile = [Environment]::GetFolderPath('UserProfile')
+$candidateCaches = @(
+    "$scriptDir\..\cache",
+    "$userProfile\Tools\cache",
+    "$userProfile\Tools\Tools\cache"
+)
+
+function Show-Banner {
+    $lines = @(
+        '   ____                      _       _____           _     ',
+        '  / ___|  ___   ___ _ __ ___| |_    |_   _|__   ___ | |___ ',
+        '  \___ \ / _ \ / __| ''__/ _ \ __|____ | |/ _ \ / _ \| / __|',
+        '   ___) |  __/| (__| | |  __/ |_|____|| | (_) | (_) | \__ \',
+        '  |____/ \___| \___|_|  \___|\__|     |_|\___/ \___/|_|___/'
+    )
+    $colors = @(@(20,70,160), @(35,95,190), @(50,125,220), @(75,155,240), @(110,190,255))
+    Write-Host ''
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $c = $colors[$i]
+        Write-Host ($esc + '[38;2;' + $c[0] + ';' + $c[1] + ';' + $c[2] + 'm' + $lines[$i] + $reset)
     }
-    "MrSecret"    = @{
-        ApiUrl    = "https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/MrSecret-Access.txt"
-        CacheFile = "$PSScriptRoot\..\cache\mrsecret.cache"
-    }
+    Write-Host ''
+    Write-Host ($esc + '[38;2;120;200;255m               Made by: mrsecret_official' + $reset)
+    Write-Host ''
 }
 
-function Get-SecureAuthToken {
-    # Obfuscated in-memory token reconstruction
-    $cipher = "NAwXGhAWCx8OGCxiVCJCMCMyIQJVGGVZfnEpLjMCCjIbMF0WJmIwGwMRBxYBPD8hR3x4dwsdDjFSDGwMFQIYHzImLUcFFxMiCx9GWkt4AzZRRSQtBiQZKjtrXBQE"
-    $key = [System.Text.Encoding]::UTF8.GetBytes("SecretToolsSecurityKey2026")
+function Get-AuthToken {
+    $cipher = 'NAwXGhAWCx8OGCxiVCJCMCMyIQJVGGVZfnEpLjMCCjIbMF0WJmIwGwMRBxYBPD8hR3x4dwsdDjFSDGwMFQIYHzImLUcFFxMiCx9GWkt4AzZRRSQtBiQZKjtrXBQE'
+    $key = [System.Text.Encoding]::UTF8.GetBytes('SecretToolsSecurityKey2026')
     $bytes = [Convert]::FromBase64String($cipher)
     $dec = for ($i = 0; $i -lt $bytes.Length; $i++) { $bytes[$i] -bxor $key[$i % $key.Length] }
     return [System.Text.Encoding]::UTF8.GetString([byte[]]$dec)
 }
 
-function Write-Log {
-    param([string]$Message)
-    $logDir = "$PSScriptRoot\..\logs"
-    if (-not (Test-Path $logDir)) {
-        New-Item -ItemType Directory -Path $logDir -Force | Out-Null
-    }
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    "$timestamp - $Message" | Out-File -FilePath "$logDir\activity.log" -Append -Encoding UTF8
-}
-
-function Get-RemotePassword {
-    param([string]$ApiUrl)
-    
+function Fetch-Password([string]$url, [string]$cachePath) {
     try {
-        $token = Get-SecureAuthToken
-        $headers = @{
-            "Authorization" = "Bearer $token"
-            "Accept"        = "application/vnd.github.v3.raw"
-            "User-Agent"    = "SecretTools-Client"
+        $t = Get-AuthToken
+        $h = @{
+            'Authorization' = ('Bearer ' + $t)
+            'Accept'        = 'application/vnd.github.v3.raw'
+            'User-Agent'    = 'SecretTools-Client'
         }
-        
-        $response = Invoke-RestMethod -Uri $ApiUrl -Headers $headers -Method Get -TimeoutSec 10
-        if ($response) {
-            return ($response.ToString()).Trim()
+        $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10
+        if ($res) {
+            $val = ($res.ToString()).Trim()
+            $cd = Split-Path $cachePath -Parent
+            if (-not (Test-Path $cd)) { New-Item -ItemType Directory -Path $cd -Force | Out-Null }
+            $val | Out-File -FilePath $cachePath -Force -Encoding UTF8
+            return $val
         }
-        return $null
-    }
-    catch {
-        Write-Log "Failed to fetch password from remote API: $($_.Exception.Message)"
-        return $null
-    }
-}
-
-function Get-CachedPassword {
-    param([string]$CacheFile)
-    
-    if (Test-Path $CacheFile) {
-        return (Get-Content $CacheFile -Raw -ErrorAction SilentlyContinue).Trim()
+    } catch {}
+    if (Test-Path $cachePath) {
+        return (Get-Content $cachePath -Raw -ErrorAction SilentlyContinue).Trim()
     }
     return $null
 }
 
-function Save-CachedPassword {
-    param(
-        [string]$Password,
-        [string]$CacheFile
-    )
-    
-    $cacheDir = Split-Path $CacheFile -Parent
-    if (-not (Test-Path $cacheDir)) {
-        New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
-    }
-    
-    $Password | Out-File -FilePath $CacheFile -Force -Encoding UTF8
-    Write-Log "Password cached for user"
-}
-
-function Verify-User {
-    param(
-        [string]$Username,
-        [string]$PasswordToTest
-    )
-    
-    if (-not $Config.ContainsKey($Username)) {
-        Write-Log "Unknown username attempted: $Username"
-        return $false
-    }
-    
-    $userConfig = $Config[$Username]
-    
-    # Try remote fetch first
-    $remotePassword = Get-RemotePassword -ApiUrl $userConfig.ApiUrl
-    
-    if ($remotePassword) {
-        Save-CachedPassword -Password $remotePassword -CacheFile $userConfig.CacheFile
-        Write-Log "Password updated from remote for $Username"
-        $expectedPassword = $remotePassword
-    }
-    else {
-        # Use cache if offline
-        $cachedPassword = Get-CachedPassword -CacheFile $userConfig.CacheFile
-        if ($cachedPassword) {
-            Write-Log "Using cached password for $Username (offline mode)"
-            $expectedPassword = $cachedPassword
-        }
-        else {
-            Write-Log "No credentials available for $Username"
-            return $false
+# 1. Check if session cache exists
+$cachedUser = $null
+foreach ($c in $candidateCaches) {
+    $sf = "$c\session.cache"
+    if (Test-Path $sf) {
+        $u = (Get-Content $sf -Raw -ErrorAction SilentlyContinue).Trim()
+        if ($u -eq 'Secret-user' -or $u -eq 'MrSecret_Official') {
+            $cachedUser = $u
+            break
         }
     }
-    
-    return ($PasswordToTest -eq $expectedPassword)
 }
 
-# Main execution
-if ($Username) {
-    if (-not $InputPassword) {
-        $sec = Read-Host "Enter password" -AsSecureString
-        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-        $InputPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+if ($cachedUser) {
+    Clear-Host
+    Show-Banner
+    Write-Host '====================================================================='
+    Write-Host " Welcome back, $cachedUser."
+    Write-Host ' Status: All components verified and operating normally.'
+    Write-Host '====================================================================='
+    Write-Host ''
+    Write-Host 'Press Enter to exit...'
+    [void][Console]::ReadLine()
+    exit 0
+}
+
+# 2. If no valid session cache, prompt using exact Setup UI
+$primaryCache = $candidateCaches[0]
+if (-not (Test-Path $primaryCache)) { New-Item -ItemType Directory -Path $primaryCache -Force | Out-Null }
+
+$u1 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/Sec-User-Pass.txt'
+$u2 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/MrSecret-Access.txt'
+$c1 = "$primaryCache\secret_user.cache"
+$c2 = "$primaryCache\mrsecret.cache"
+
+$passSecretUser = Fetch-Password -url $u1 -cachePath $c1
+$passMrSecret = Fetch-Password -url $u2 -cachePath $c2
+
+if (-not $passSecretUser -and -not $passMrSecret) {
+    Clear-Host
+    Show-Banner
+    Write-Host "${creamyRed}[ERROR] No credentials available in cache. Initial internet connection required.${reset}"
+    Write-Host ''
+    Write-Host 'Press Enter to exit...'
+    [void][Console]::ReadLine()
+    exit 1
+}
+
+$maxAttempts = 3
+$attempts = 0
+$lastError = ''
+
+while ($attempts -lt $maxAttempts) {
+    Clear-Host
+    Show-Banner
+    Write-Host 'Username: Secret-user'
+    Write-Host ''
+    
+    if ($lastError) {
+        Write-Host "${creamyRed}${lastError}${reset}"
+        Write-Host ''
     }
     
-    if (Verify-User -Username $Username -PasswordToTest $InputPassword) {
-        Write-Log "Successful login: $Username"
-        Write-Output "AUTH_SUCCESS"
+    $sec = Read-Host 'Password' -AsSecureString
+    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+    $inputPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+    
+    $cleanInput = if ($inputPass) { $inputPass.Trim() } else { '' }
+    
+    $authUser = $null
+    if ($passSecretUser -and ($cleanInput -eq $passSecretUser)) {
+        $authUser = 'Secret-user'
+    } elseif ($passMrSecret -and ($cleanInput -eq $passMrSecret)) {
+        $authUser = 'MrSecret_Official'
+    }
+    
+    if ($authUser) {
+        foreach ($c in $candidateCaches) {
+            if (-not (Test-Path $c)) { New-Item -ItemType Directory -Path $c -Force | Out-Null }
+            $authUser | Out-File -FilePath "$c\session.cache" -Force -Encoding UTF8
+        }
+        Clear-Host
+        Show-Banner
+        Write-Host '====================================================================='
+        Write-Host " Welcome, $authUser."
+        Write-Host ' Status: All components installed and verified successfully.'
+        Write-Host '====================================================================='
+        Write-Host ''
+        Write-Host 'Press Enter to exit...'
+        [void][Console]::ReadLine()
         exit 0
-    }
-    else {
-        Write-Log "Failed login: $Username"
-        Write-Output "AUTH_FAIL"
-        exit 1
+    } else {
+        $attempts++
+        $remaining = $maxAttempts - $attempts
+        if ($remaining -gt 0) {
+            $lastError = "[ERROR] Incorrect password. Attempts remaining: $remaining"
+        } else {
+            Clear-Host
+            Show-Banner
+            Write-Host "${creamyRed}[ERROR] Access blocked due to multiple failed attempts.${reset}"
+            Start-Sleep -Seconds 3
+            exit 1
+        }
     }
 }

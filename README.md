@@ -1,6 +1,7 @@
-# Secret-Tools-Win
+# Secret-Tools
 
 Personal management and recovery tool for Windows.
+**Made by: mrsecret_official**
 
 ## PERSONAL USE ONLY
 This tool is for **PERSONAL USE ONLY** on your own devices.
@@ -19,7 +20,7 @@ This single script:
 - Fetches all required files automatically from the private repository.
 - Installs the project into `%USERPROFILE%\Tools`.
 - Adds `%USERPROFILE%\Tools` to your system `PATH`.
-- Creates a Desktop shortcut (`Secret-Tools-Win.lnk`).
+- Creates a Desktop shortcut (`Secret-Tools.lnk`).
 - Checks for future updates automatically every time it runs.
 
 ---
