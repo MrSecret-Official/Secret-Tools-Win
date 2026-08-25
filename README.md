@@ -7,24 +7,38 @@ This tool is for **PERSONAL USE ONLY** on your own devices.
 
 ---
 
-## One-Click Setup & Auto-Updater
+## 1. Quick Installation
 
-To install or run the project, execute **`Setup-Tools.bat`**:
+Execute **`Setup-Tools.bat`**:
 
 ```cmd
 Setup-Tools.bat
 ```
 
-### Features
-1. **Standalone Portability**: You only need to pass or run `Setup-Tools.bat`. It fetches the complete project automatically from the private repository.
-2. **Installation Directory**: Installed directly into `%USERPROFILE%\Tools`.
-3. **Automatic PATH Integration**: Automatically registers `%USERPROFILE%\Tools` and `%USERPROFILE%\Tools\Tools` into the User's Windows `PATH`.
-4. **Auto-Updater**: Every time `Setup-Tools.bat` is executed (or via the Desktop shortcut), it queries the GitHub API for newer commits. If a new version exists, it updates all files automatically.
-5. **Offline Support**: If offline, it immediately loads the local installation and cached credentials.
+This single script:
+- Fetches all required files automatically from the private repository.
+- Installs the project into `%USERPROFILE%\Tools`.
+- Adds `%USERPROFILE%\Tools` to your system `PATH`.
+- Creates a Desktop shortcut (`Secret-Tools-Win.lnk`).
+- Checks for future updates automatically every time it runs.
+
+---
+
+## 2. Usage from Any Terminal
+
+Once installed, simply open any standard Windows Terminal, CMD, or PowerShell and type:
+
+```cmd
+secret-tools
+```
+
+This immediately prompts for credentials:
+1. **Username**: (`Secret-user` or `MrSecret`)
+2. **Password**: (Hidden password prompt authenticated securely via remote repository / offline cache)
 
 ---
 
 ## User Accounts
-Both user accounts have equal access to all administrative features:
+Both accounts have equal access to all administrative features:
 - **Secret-user**: Authenticates against remote `Sec-User-Pass.txt`.
 - **MrSecret**: Authenticates against remote `MrSecret-Access.txt`.
