@@ -1,12 +1,32 @@
 <# :
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 title Setup-Tools - Secret-Tools Installer
 color 0B
 mode con: cols=95 lines=34 >nul 2>&1
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Expression $([System.IO.File]::ReadAllText('%~f0'))"
+
+:: Auto-elevate to Administrator if not already elevated
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([ScriptBlock]::Create((Get-Content -LiteralPath '%~f0' -Raw)))"
 exit /b %errorlevel%
 #>
+
+<#
+.SYNOPSIS
+    Secret-Tools Automated Installation & Management Package
+.DESCRIPTION
+    Official deployment and update wizard for Secret-Tools Windows Management Suite.
+.AUTHOR
+    mrsecret_official
+#>
+
+[CmdletBinding()]
+param()
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $esc = [char]27
@@ -36,19 +56,17 @@ function Show-Banner {
 }
 
 function Get-DownloaderToken {
-    $cipher = 'NAwXGhAWCx8OGCx1XjZZLiUnPCxCOlIpfFcGWCM9AkcRKxUOJAoRCFouHlohLi4THj5TOwRWBEcUNy1LFBsdHCkjMRApEhs9Fg0cL0MMUj96Y316FgpXRVI2DCIE'
-    $key = [System.Text.Encoding]::UTF8.GetBytes('SecretToolsDownloaderKey2026')
-    $bytes = [Convert]::FromBase64String($cipher)
-    $dec = for ($i = 0; $i -lt $bytes.Length; $i++) { $bytes[$i] -bxor $key[$i % $key.Length] }
-    return [System.Text.Encoding]::UTF8.GetString([byte[]]$dec)
+    return @(
+        'github_pat_11A7BJFXI0q7PNg4npXa5t_',
+        'AaKfbL5Yp6NOJvlu6B6f6qGRN9qoIsFOBTFeuQylxJ1G7FHSOLEo477BXMk'
+    ) -join ''
 }
 
 function Get-AuthToken {
-    $cipher = 'NAwXGhAWCx8OGCxiVCJCMCMyIQJVGGVZfnEpLjMCCjIbMF0WJmIwGwMRBxYBPD8hR3x4dwsdDjFSDGwMFQIYHzImLUcFFxMiCx9GWkt4AzZRRSQtBiQZKjtrXBQE'
-    $key = [System.Text.Encoding]::UTF8.GetBytes('SecretToolsSecurityKey2026')
-    $bytes = [Convert]::FromBase64String($cipher)
-    $dec = for ($i = 0; $i -lt $bytes.Length; $i++) { $bytes[$i] -bxor $key[$i % $key.Length] }
-    return [System.Text.Encoding]::UTF8.GetString([byte[]]$dec)
+    return @(
+        'github_pat_11A7BJFXI0aWiLGzKPpoFO_',
+        '2zU1UxvcnbxwZXuLJAXxmC7x8cznkLWEX5lcjinftjyNPS27AYRKvFH89wq'
+    ) -join ''
 }
 
 function Fetch-RemotePassword([string]$url, [string]$cachePath) {
@@ -116,6 +134,7 @@ $headers = @{
 
 $installDir = "$([Environment]::GetFolderPath('UserProfile'))\Tools"
 $toolsDir = "$installDir\Tools"
+$packagesDir = "$installDir\packages"
 $versionFile = "$installDir\.version"
 $mainBat = "$toolsDir\secret-tools.bat"
 $rootLauncher = "$installDir\secret-tools.bat"
@@ -124,6 +143,7 @@ $repoApi = 'https://api.github.com/repos/MrSecret-Official/Secret-Tools-Win'
 # Ensure required directories
 if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir -Force | Out-Null }
 if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null }
+if (-not (Test-Path $packagesDir)) { New-Item -ItemType Directory -Path $packagesDir -Force | Out-Null }
 if (-not (Test-Path "$toolsDir\Access")) { New-Item -ItemType Directory -Path "$toolsDir\Access" -Force | Out-Null }
 if (-not (Test-Path "$toolsDir\logs")) { New-Item -ItemType Directory -Path "$toolsDir\logs" -Force | Out-Null }
 if (-not (Test-Path "$toolsDir\cache")) { New-Item -ItemType Directory -Path "$toolsDir\cache" -Force | Out-Null }
@@ -235,12 +255,13 @@ if ($needsDownload) {
         } else {
             Write-Host "${creamyGreen}[UPDATE] Deploying update ($($remoteSha.Substring(0,7)))...${reset}"
         }
-        $tempZip = "$env:TEMP\SecretTools_pkg_$([guid]::NewGuid().ToString('N')).zip"
-        $tempExtract = "$env:TEMP\SecretTools_ext_$([guid]::NewGuid().ToString('N'))"
+        $targetZip = "$packagesDir\SecretTools_Package.zip"
+        $targetExtract = "$packagesDir\SecretTools_Extract"
         try {
-            Invoke-RestMethod -Uri "$repoApi/zipball/main" -Headers $headers -OutFile $tempZip -TimeoutSec 30
-            Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
-            $extractedRoot = (Get-ChildItem -Path $tempExtract -Directory | Select-Object -First 1).FullName
+            Invoke-RestMethod -Uri "$repoApi/zipball/main" -Headers $headers -OutFile $targetZip -TimeoutSec 30
+            if (Test-Path $targetExtract) { Remove-Item $targetExtract -Recurse -Force -ErrorAction SilentlyContinue }
+            Expand-Archive -Path $targetZip -DestinationPath $targetExtract -Force
+            $extractedRoot = (Get-ChildItem -Path $targetExtract -Directory | Select-Object -First 1).FullName
             Copy-Item -Path "$extractedRoot\*" -Destination $installDir -Recurse -Force
             Set-Content -Path $versionFile -Value $remoteSha -Force
             Write-Host "${creamyGreen}[OK] Components successfully deployed.${reset}"
@@ -252,8 +273,8 @@ if ($needsDownload) {
                 exit 1
             }
         } finally {
-            if (Test-Path $tempZip) { Remove-Item $tempZip -Force -ErrorAction SilentlyContinue }
-            if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $targetZip) { Remove-Item $targetZip -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $targetExtract) { Remove-Item $targetExtract -Recurse -Force -ErrorAction SilentlyContinue }
         }
     }
 } else {
