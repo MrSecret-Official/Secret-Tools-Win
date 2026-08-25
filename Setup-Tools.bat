@@ -59,7 +59,7 @@ function Fetch-RemotePassword([string]$url, [string]$cachePath) {
             'Accept'        = 'application/vnd.github.v3.raw'
             'User-Agent'    = 'SecretTools-Client'
         }
-        $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10
+        $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue
         if ($res) {
             $val = ($res.ToString()).Trim()
             $cd = Split-Path $cachePath -Parent
@@ -131,7 +131,7 @@ if (-not (Test-Path "$toolsDir\cache")) { New-Item -ItemType Directory -Path "$t
 Write-Host "${creamyCyan}Checking repository update status...${reset}"
 $remoteSha = $null
 try {
-    $commitInfo = Invoke-RestMethod -Uri "$repoApi/commits/main" -Headers $headers -Method Get -TimeoutSec 10
+    $commitInfo = Invoke-RestMethod -Uri "$repoApi/commits/main" -Headers $headers -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue
     $remoteSha = $commitInfo.sha
 } catch {}
 
