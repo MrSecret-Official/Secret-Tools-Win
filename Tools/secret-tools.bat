@@ -12,6 +12,7 @@ exit /b %errorlevel%
 $esc = [char]27
 $creamyGreen = "$esc[38;2;145;225;165m"
 $creamyRed   = "$esc[38;2;235;120;120m"
+$creamyYellow= "$esc[38;2;245;220;130m"
 $creamyCyan  = "$esc[38;2;130;210;245m"
 $reset       = "$esc[0m"
 
@@ -75,6 +76,55 @@ function Fetch-Password([string]$url, [string]$cachePath) {
     return $null
 }
 
+function Read-MaskedPassword {
+    $pass = ""
+    while ($true) {
+        $key = [Console]::ReadKey($true)
+        if ($key.Key -eq [ConsoleKey]::Enter) {
+            break
+        } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
+            if ($pass.Length -gt 0) {
+                $pass = $pass.Substring(0, $pass.Length - 1)
+                Write-Host -NoNewline "`b `b"
+            }
+        } else {
+            $char = $key.KeyChar
+            if ([int]$char -ge 32) {
+                $pass += $char
+                Write-Host -NoNewline "*"
+            }
+        }
+    }
+    Write-Host ""
+    return $pass
+}
+
+# Check for updates in the background (Non-blocking notice in yellow)
+$updateNotice = $null
+$versionFile = "$userProfile\Tools\.version"
+if (-not (Test-Path $versionFile)) { $versionFile = "$scriptDir\.version" }
+$localSha = ''
+if (Test-Path $versionFile) {
+    $localSha = (Get-Content $versionFile -Raw -ErrorAction SilentlyContinue).Trim()
+}
+
+if ($localSha) {
+    try {
+        $t = Get-AuthToken
+        $h = @{
+            'Authorization' = ('Bearer ' + $t)
+            'Accept'        = 'application/vnd.github.v3+json'
+            'User-Agent'    = 'SecretTools-Client'
+        }
+        $repoApi = 'https://api.github.com/repos/MrSecret-Official/Secret-Tools-Win'
+        $commit = Invoke-RestMethod -Uri "$repoApi/commits/main" -Headers $h -Method Get -TimeoutSec 4
+        if ($commit -and $commit.sha -and ($commit.sha -ne $localSha)) {
+            $remoteShort = $commit.sha.Substring(0, 7)
+            $updateNotice = "[UPDATE] A new update ($remoteShort) is available. Run Setup-Tools.bat to upgrade."
+        }
+    } catch {}
+}
+
 # 1. Check if session cache exists from Setup or previous login
 $cachedUser = $null
 foreach ($c in $candidateCaches) {
@@ -91,6 +141,10 @@ foreach ($c in $candidateCaches) {
 if ($cachedUser) {
     Clear-Host
     Show-Banner
+    if ($updateNotice) {
+        Write-Host "${creamyYellow}$updateNotice${reset}"
+        Write-Host ''
+    }
     Write-Host '====================================================================='
     Write-Host " Welcome back, $cachedUser."
     Write-Host ' Status: All components verified and operating normally.'
@@ -101,7 +155,7 @@ if ($cachedUser) {
     exit 0
 }
 
-# 2. If no valid session cache, prompt for credentials using exact Setup UI
+# 2. If no valid session cache, prompt for credentials using clean single-field layout
 $primaryCache = $candidateCaches[0]
 if (-not (Test-Path $primaryCache)) { New-Item -ItemType Directory -Path $primaryCache -Force | Out-Null }
 
@@ -130,19 +184,24 @@ $lastError = ''
 while ($attempts -lt $maxAttempts) {
     Clear-Host
     Show-Banner
+    if ($updateNotice) {
+        Write-Host "${creamyYellow}$updateNotice${reset}"
+        Write-Host ''
+    }
     Write-Host 'Username: Secret-user'
     Write-Host ''
     
+    $passLine = [Console]::CursorTop
+    Write-Host -NoNewline 'Password: '
     if ($lastError) {
-        Write-Host "${creamyRed}${lastError}${reset}"
         Write-Host ''
+        Write-Host "${creamyRed}${lastError}${reset}"
+        try {
+            [Console]::SetCursorPosition(10, $passLine)
+        } catch {}
     }
     
-    $sec = Read-Host 'Password' -AsSecureString
-    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-    $inputPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-    
+    $inputPass = Read-MaskedPassword
     $cleanInput = if ($inputPass) { $inputPass.Trim() } else { '' }
     
     $authUser = $null
@@ -159,6 +218,10 @@ while ($attempts -lt $maxAttempts) {
         }
         Clear-Host
         Show-Banner
+        if ($updateNotice) {
+            Write-Host "${creamyYellow}$updateNotice${reset}"
+            Write-Host ''
+        }
         Write-Host '====================================================================='
         Write-Host " Welcome, $authUser."
         Write-Host ' Status: All components installed and verified successfully.'
@@ -175,6 +238,9 @@ while ($attempts -lt $maxAttempts) {
         } else {
             Clear-Host
             Show-Banner
+            Write-Host 'Username: Secret-user'
+            Write-Host ''
+            Write-Host 'Password: '
             Write-Host "${creamyRed}[ERROR] Access blocked due to multiple failed attempts.${reset}"
             Start-Sleep -Seconds 3
             exit 1

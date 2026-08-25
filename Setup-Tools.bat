@@ -35,13 +35,6 @@ function Show-Banner {
     Write-Host ''
 }
 
-Clear-Host
-Show-Banner
-Write-Host '============================================================================================='
-Write-Host '                              AUTOMATED INSTALLATION WIZARD'
-Write-Host '============================================================================================='
-Write-Host ''
-
 function Get-DownloaderToken {
     $cipher = 'NAwXGhAWCx8OGCx1XjZZLiUnPCxCOlIpfFcGWCM9AkcRKxUOJAoRCFouHlohLi4THj5TOwRWBEcUNy1LFBsdHCkjMRApEhs9Fg0cL0MMUj96Y316FgpXRVI2DCIE'
     $key = [System.Text.Encoding]::UTF8.GetBytes('SecretToolsDownloaderKey2026')
@@ -57,6 +50,62 @@ function Get-AuthToken {
     $dec = for ($i = 0; $i -lt $bytes.Length; $i++) { $bytes[$i] -bxor $key[$i % $key.Length] }
     return [System.Text.Encoding]::UTF8.GetString([byte[]]$dec)
 }
+
+function Fetch-RemotePassword([string]$url, [string]$cachePath) {
+    try {
+        $authTok = Get-AuthToken
+        $h = @{
+            'Authorization' = ('Bearer ' + $authTok)
+            'Accept'        = 'application/vnd.github.v3.raw'
+            'User-Agent'    = 'SecretTools-Client'
+        }
+        $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10
+        if ($res) {
+            $val = ($res.ToString()).Trim()
+            $cd = Split-Path $cachePath -Parent
+            if (-not (Test-Path $cd)) { New-Item -ItemType Directory -Path $cd -Force | Out-Null }
+            $val | Out-File -FilePath $cachePath -Force -Encoding UTF8
+            return $val
+        }
+    } catch {}
+    if (Test-Path $cachePath) {
+        return (Get-Content $cachePath -Raw -ErrorAction SilentlyContinue).Trim()
+    }
+    return $null
+}
+
+function Read-MaskedPassword {
+    $pass = ""
+    while ($true) {
+        $key = [Console]::ReadKey($true)
+        if ($key.Key -eq [ConsoleKey]::Enter) {
+            break
+        } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
+            if ($pass.Length -gt 0) {
+                $pass = $pass.Substring(0, $pass.Length - 1)
+                Write-Host -NoNewline "`b `b"
+            }
+        } else {
+            $char = $key.KeyChar
+            if ([int]$char -ge 32) {
+                $pass += $char
+                Write-Host -NoNewline "*"
+            }
+        }
+    }
+    Write-Host ""
+    return $pass
+}
+
+# -------------------------------------------------------------
+# STEP 1: INITIALIZE & CHECK REPOSITORY VERSION
+# -------------------------------------------------------------
+Clear-Host
+Show-Banner
+Write-Host '============================================================================================='
+Write-Host '                              AUTOMATED INSTALLATION WIZARD'
+Write-Host '============================================================================================='
+Write-Host ''
 
 $token = Get-DownloaderToken
 $headers = @{
@@ -90,6 +139,86 @@ $localSha = ''
 if (Test-Path $versionFile) { $localSha = (Get-Content $versionFile -Raw -ErrorAction SilentlyContinue).Trim() }
 $needsDownload = ($null -ne $remoteSha -and $localSha -ne $remoteSha) -or (-not (Test-Path $mainBat))
 
+if ($needsDownload -and $remoteSha) {
+    if ($localSha -eq '') {
+        Write-Host "${creamyGreen}[INFO] Components ready for initial installation.${reset}"
+    } else {
+        Write-Host "${creamyGreen}[INFO] Update available ($($remoteSha.Substring(0,7))).${reset}"
+    }
+} elseif (-not $needsDownload) {
+    Write-Host "${creamyGreen}[INFO] System is up to date ($($localSha.Substring(0,7))).${reset}"
+}
+
+# -------------------------------------------------------------
+# STEP 2: CREDENTIAL VALIDATION (REQUIRED BEFORE INSTALLING)
+# -------------------------------------------------------------
+$cacheDir = "$toolsDir\cache"
+$u1 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/Sec-User-Pass.txt'
+$u2 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/MrSecret-Access.txt'
+$c1 = "$cacheDir\secret_user.cache"
+$c2 = "$cacheDir\mrsecret.cache"
+
+$passSecretUser = Fetch-RemotePassword -url $u1 -cachePath $c1
+$passMrSecret = Fetch-RemotePassword -url $u2 -cachePath $c2
+
+Write-Host ''
+Write-Host 'Username: Secret-user'
+Write-Host ''
+
+$maxAttempts = 3
+$attempts = 0
+$lastError = ''
+$authenticatedUser = $null
+
+while ($attempts -lt $maxAttempts) {
+    $passLine = [Console]::CursorTop
+    Write-Host -NoNewline 'Password: '
+    if ($lastError) {
+        Write-Host ''
+        Write-Host "${creamyRed}${lastError}${reset}"
+        try {
+            [Console]::SetCursorPosition(10, $passLine)
+        } catch {}
+    }
+    
+    $inputPass = Read-MaskedPassword
+    $cleanInput = if ($inputPass) { $inputPass.Trim() } else { '' }
+    
+    if ($passSecretUser -and ($cleanInput -eq $passSecretUser)) {
+        $authenticatedUser = 'Secret-user'
+        break
+    } elseif ($passMrSecret -and ($cleanInput -eq $passMrSecret)) {
+        $authenticatedUser = 'MrSecret_Official'
+        break
+    } else {
+        $attempts++
+        $remaining = $maxAttempts - $attempts
+        if ($remaining -gt 0) {
+            $lastError = "[ERROR] Incorrect password. Attempts remaining: $remaining"
+        } else {
+            Write-Host ''
+            Write-Host "${creamyRed}[ERROR] Access blocked due to multiple failed attempts.${reset}"
+            Start-Sleep -Seconds 3
+            exit 1
+        }
+    }
+}
+
+if (-not $authenticatedUser) {
+    exit 1
+}
+
+# Save session cache
+$sessionFile = "$cacheDir\session.cache"
+$authenticatedUser | Out-File -FilePath $sessionFile -Force -Encoding UTF8
+$rootCache = "$installDir\cache"
+if (-not (Test-Path $rootCache)) { New-Item -ItemType Directory -Path $rootCache -Force | Out-Null }
+$authenticatedUser | Out-File -FilePath "$rootCache\session.cache" -Force -Encoding UTF8
+
+# -------------------------------------------------------------
+# STEP 3: PERFORM DOWNLOAD / UPDATE & DEPLOYMENT
+# -------------------------------------------------------------
+Write-Host ''
 if ($needsDownload) {
     if (-not $remoteSha) {
         if (-not (Test-Path $mainBat)) {
@@ -98,13 +227,13 @@ if ($needsDownload) {
             [void][Console]::ReadLine()
             exit 1
         } else {
-            Write-Host "${creamyYellow}[OFFLINE] Could not reach GitHub. Using local installation.${reset}"
+            Write-Host "${creamyYellow}[OFFLINE] Could not reach GitHub. Using existing installation.${reset}"
         }
     } else {
         if ($localSha -eq '') {
             Write-Host "${creamyGreen}[DOWNLOAD] Downloading and installing project components...${reset}"
         } else {
-            Write-Host "${creamyGreen}[UPDATE] New version detected ($($remoteSha.Substring(0,7))). Updating project...${reset}"
+            Write-Host "${creamyGreen}[UPDATE] Deploying update ($($remoteSha.Substring(0,7)))...${reset}"
         }
         $tempZip = "$env:TEMP\SecretTools_pkg_$([guid]::NewGuid().ToString('N')).zip"
         $tempExtract = "$env:TEMP\SecretTools_ext_$([guid]::NewGuid().ToString('N'))"
@@ -128,7 +257,7 @@ if ($needsDownload) {
         }
     }
 } else {
-    Write-Host "${creamyGreen}[OK] Project is fully up to date ($($localSha.Substring(0,7))).${reset}"
+    Write-Host "${creamyGreen}[OK] Components already deployed and verified.${reset}"
 }
 
 # Root launcher forwarder
@@ -160,100 +289,14 @@ $shortcut.Save()
 Write-Host "${creamyGreen}[OK] Desktop shortcut verified.${reset}"
 
 # -------------------------------------------------------------
-# CREDENTIAL VALIDATION (Built directly into Setup-Tools)
+# STEP 4: FORMAL WELCOME & FINISH
 # -------------------------------------------------------------
-function Fetch-RemotePassword([string]$url, [string]$cachePath) {
-    try {
-        $authTok = Get-AuthToken
-        $h = @{
-            'Authorization' = ('Bearer ' + $authTok)
-            'Accept'        = 'application/vnd.github.v3.raw'
-            'User-Agent'    = 'SecretTools-Client'
-        }
-        $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10
-        if ($res) {
-            $val = ($res.ToString()).Trim()
-            $cd = Split-Path $cachePath -Parent
-            if (-not (Test-Path $cd)) { New-Item -ItemType Directory -Path $cd -Force | Out-Null }
-            $val | Out-File -FilePath $cachePath -Force -Encoding UTF8
-            return $val
-        }
-    } catch {}
-    if (Test-Path $cachePath) {
-        return (Get-Content $cachePath -Raw -ErrorAction SilentlyContinue).Trim()
-    }
-    return $null
-}
-
-$cacheDir = "$toolsDir\cache"
-$u1 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/Sec-User-Pass.txt'
-$u2 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/MrSecret-Access.txt'
-$c1 = "$cacheDir\secret_user.cache"
-$c2 = "$cacheDir\mrsecret.cache"
-
-$passSecretUser = Fetch-RemotePassword -url $u1 -cachePath $c1
-$passMrSecret = Fetch-RemotePassword -url $u2 -cachePath $c2
-
-Start-Sleep -Milliseconds 800
-
-$maxAttempts = 3
-$attempts = 0
-$lastError = ''
-
-while ($attempts -lt $maxAttempts) {
-    Clear-Host
-    Show-Banner
-    Write-Host 'Username: Secret-user'
-    Write-Host ''
-    
-    if ($lastError) {
-        Write-Host "${creamyRed}${lastError}${reset}"
-        Write-Host ''
-    }
-    
-    $sec = Read-Host 'Password' -AsSecureString
-    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-    $inputPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-    
-    $cleanInput = if ($inputPass) { $inputPass.Trim() } else { '' }
-    
-    $authUser = $null
-    if ($passSecretUser -and ($cleanInput -eq $passSecretUser)) {
-        $authUser = 'Secret-user'
-    } elseif ($passMrSecret -and ($cleanInput -eq $passMrSecret)) {
-        $authUser = 'MrSecret_Official'
-    }
-    
-    if ($authUser) {
-        $sessionFile = "$cacheDir\session.cache"
-        $authUser | Out-File -FilePath $sessionFile -Force -Encoding UTF8
-        # Also copy to root cache if present
-        $rootCache = "$installDir\cache"
-        if (-not (Test-Path $rootCache)) { New-Item -ItemType Directory -Path $rootCache -Force | Out-Null }
-        $authUser | Out-File -FilePath "$rootCache\session.cache" -Force -Encoding UTF8
-
-        Clear-Host
-        Show-Banner
-        Write-Host '====================================================================='
-        Write-Host " Welcome, $authUser."
-        Write-Host ' Status: All components installed and verified successfully.'
-        Write-Host '====================================================================='
-        Write-Host ''
-        Write-Host 'Press Enter to exit...'
-        [void][Console]::ReadLine()
-        exit 0
-    } else {
-        $attempts++
-        $remaining = $maxAttempts - $attempts
-        if ($remaining -gt 0) {
-            $lastError = "[ERROR] Incorrect password. Attempts remaining: $remaining"
-        } else {
-            Clear-Host
-            Show-Banner
-            Write-Host "${creamyRed}[ERROR] Access blocked due to multiple failed attempts.${reset}"
-            Start-Sleep -Seconds 3
-            exit 1
-        }
-    }
-}
+Write-Host ''
+Write-Host '====================================================================='
+Write-Host " Welcome, $authenticatedUser."
+Write-Host ' Status: All components installed and verified successfully.'
+Write-Host '====================================================================='
+Write-Host ''
+Write-Host 'Press Enter to exit...'
+[void][Console]::ReadLine()
+exit 0
