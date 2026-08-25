@@ -866,6 +866,64 @@ function Assistant-ViewLogs {
     [void][Console]::ReadLine()
 }
 
+# 9. SYSTEM HEALTH REPORT
+function Assistant-HealthReport {
+    Invoke-AssistantHeader "ASSISTANT: SYSTEM HEALTH REPORT" "Generates a comprehensive HTML report of hardware, software, services and security status."
+
+    if ($isWinRE) {
+        Write-Host "${creamyYellow}[INFO] Full HTML report is only available in standard Windows mode (not WinRE).${reset}"
+        Write-Host 'Press Enter to return to main menu...'
+        [void][Console]::ReadLine()
+        return
+    }
+
+    $reportModule = $null
+    $candidates = @(
+        "$scriptDir\Generate-HealthReport.ps1",
+        "$installDir\Tools\Generate-HealthReport.ps1",
+        "$toolsDir\Generate-HealthReport.ps1",
+        "$installDir\Generate-HealthReport.ps1"
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path $c) { $reportModule = $c; break }
+    }
+
+    if (-not $reportModule) {
+        Write-Host "${creamyRed}[ERROR] Generate-HealthReport.ps1 not found. Please re-run Setup-Tools.bat.${reset}"
+        Write-Host 'Press Enter to return to main menu...'
+        [void][Console]::ReadLine()
+        return
+    }
+
+    Write-Host "${creamyCyan}[REPORT] Collecting system data, this may take a few seconds...${reset}"
+    Write-Host ''
+
+    $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $reportDir = "$installDir\reports"
+    if (-not (Test-Path $reportDir)) { New-Item -ItemType Directory -Path $reportDir -Force | Out-Null }
+    $outPath = "$reportDir\SecretTools_HealthReport_$timestamp.html"
+
+    try {
+        $result = & powershell -NoProfile -ExecutionPolicy Bypass -File "$reportModule" -OutputPath $outPath -TargetDrive $targetWinDrive 2>&1
+        if (Test-Path $outPath) {
+            Write-Host "${creamyGreen}[OK] Report saved to:${reset}"
+            Write-Host "     ${creamyCyan}$outPath${reset}"
+            Write-Host ''
+            Write-Host "Opening in default browser..."
+            Start-Process $outPath -ErrorAction SilentlyContinue
+            Write-AssistantLog "HealthReport" "SUCCESS" "HTML report generated: $outPath"
+        } else {
+            Write-Host "${creamyRed}[ERROR] Report generation failed.${reset}"
+        }
+    } catch {
+        Write-Host "${creamyRed}[ERROR] $($_.Exception.Message)${reset}"
+    }
+
+    Write-Host ''
+    Write-Host 'Press Enter to return to main menu...'
+    [void][Console]::ReadLine()
+}
+
 # ===================================================================
 # MAIN ASSISTANT MENU LOOP
 # ===================================================================
@@ -892,12 +950,13 @@ while ($true) {
     Write-Host "  ${accentBlue}[6] Windows Update Clean & Reset (SoftwareDistribution / Catroot2)${reset}"
     Write-Host "  ${accentBlue}[7] Emergency Access Accounts (Enable Administrator / Create Recovery User)${reset}"
     Write-Host "  ${accentBlue}[8] Repair History & Logs Viewer (SrtTrail / Event Log)${reset}"
+    Write-Host "  ${creamyCyan}[H] Generate System Health Report (HTML)${reset}"
     Write-Host "  ${creamyRed}[9] Sign Out / Clear Cached Credentials${reset}"
     Write-Host "  ${dimText}[0] Exit${reset}"
     Write-Host ''
     Write-Host '============================================================================================='
     Write-Host ''
-    $choice = Read-Host "Select an option (0-9)"
+    $choice = Read-Host "Select an option (0-9, H)"
 
     switch ($choice.Trim()) {
         '1' { Assistant-SmartDiagnosis }
@@ -908,6 +967,7 @@ while ($true) {
         '6' { Assistant-WindowsUpdateRepair }
         '7' { Assistant-EmergencyAccount }
         '8' { Assistant-ViewLogs }
+        { $_ -in 'H','h' } { Assistant-HealthReport }
         '9' {
             foreach ($c in $candidateCaches) {
                 try {
