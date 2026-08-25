@@ -363,50 +363,75 @@ $html = @"
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        margin-bottom: 32px;
+        gap: 30px;
     }
 
-    .brand {
+    .header-left {
         display: flex;
-        align-items: center;
-        gap: 14px;
+        flex-direction: column;
     }
 
-    .brand-icon {
-        width: 42px;
-        height: 42px;
-        background: linear-gradient(135deg, var(--accent-blue), #1a6fd4);
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
+    .report-title {
+        font-size: 28px;
         font-weight: 700;
-        color: #fff;
-        letter-spacing: -1px;
-        flex-shrink: 0;
+        color: var(--text-primary);
+        letter-spacing: -0.5px;
+        margin-bottom: 6px;
     }
 
-    .brand-text { display: flex; flex-direction: column; }
-    .brand-name { font-size: 13px; font-weight: 600; color: var(--text-primary); letter-spacing: 0.5px; }
-    .brand-sub { font-size: 11px; color: var(--text-muted); }
+    .report-subtitle {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+    }
 
-    .report-meta { text-align: right; }
-    .report-date { font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
-    .report-host { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .header-right {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: flex-start;
+    }
 
-    .report-title { font-size: 28px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px; margin-bottom: 6px; }
-    .report-subtitle { font-size: 14px; color: var(--text-secondary); }
+    .brand-name {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--accent-blue);
+        letter-spacing: 0.5px;
+        line-height: 1.2;
+    }
+
+    .brand-sub {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-weight: 500;
+        margin-top: 2px;
+        margin-bottom: 12px;
+    }
+
+    .report-date {
+        font-size: 12px;
+        color: var(--text-primary);
+        font-family: 'JetBrains Mono', monospace;
+        margin-bottom: 4px;
+        text-transform: capitalize;
+    }
+
+    .report-host {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-family: 'JetBrains Mono', monospace;
+    }
 
     .overall-health {
         display: inline-flex;
         align-items: center;
         gap: 10px;
-        margin-top: 20px;
         background: var(--bg-card);
         border: 1px solid var(--border);
         border-radius: 10px;
-        padding: 10px 18px;
+        padding: 8px 16px;
+        width: fit-content;
     }
 
     .health-dot {
@@ -455,14 +480,23 @@ $html = @"
     }
 
     .section-icon {
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 14px;
         flex-shrink: 0;
+    }
+
+    .section-icon svg {
+        width: 17px;
+        height: 17px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
     }
 
     .section-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
@@ -620,26 +654,21 @@ $html = @"
 
 <header class="report-header">
     <div class="header-top">
-        <div class="brand">
-            <div class="brand-icon">ST</div>
-            <div class="brand-text">
-                <span class="brand-name">Secret-Tools</span>
-                <span class="brand-sub">Windows Management Suite</span>
+        <div class="header-left">
+            <div class="report-title">System Health Report</div>
+            <div class="report-subtitle">Comprehensive diagnostics and status analysis for $osName</div>
+            <div class="overall-health">
+                <div class="health-dot"></div>
+                <span class="health-text">Overall System Status:</span>
+                <span class="health-value">$overallHealth</span>
             </div>
         </div>
-        <div class="report-meta">
+        <div class="header-right">
+            <div class="brand-name">Secret-Tools</div>
+            <div class="brand-sub">Windows Management Suite</div>
             <div class="report-date">$reportDate</div>
-            <div class="report-host">Host: $hostname &nbsp;·&nbsp; User: $currentUser</div>
+            <div class="report-host">Host: $hostname &bull; User: $currentUser</div>
         </div>
-    </div>
-
-    <div class="report-title">System Health Report</div>
-    <div class="report-subtitle">Comprehensive diagnostics and status analysis for $osName</div>
-
-    <div class="overall-health">
-        <div class="health-dot"></div>
-        <span class="health-text">Overall System Status:</span>
-        <span class="health-value">$overallHealth</span>
     </div>
 </header>
 
@@ -650,7 +679,7 @@ $html = @"
         <div class="summary-card">
             <div class="summary-card-label">Processor</div>
             <div class="summary-card-value" style="font-size:14px;line-height:1.4">$cpuName</div>
-            <div class="summary-card-sub">$cpuCores &nbsp;·&nbsp; $cpuSpeed</div>
+            <div class="summary-card-sub">$cpuCores &bull; $cpuSpeed</div>
             <div class="summary-card-status" style="color:$(switch($cpuScore){'Healthy'{'#3fb950'}'Warning'{'#d29922'}default{'#f85149'}})">$cpuScore</div>
         </div>
         <div class="summary-card">
@@ -676,7 +705,9 @@ $html = @"
     <!-- OS -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-os">&#128187;</div>
+            <div class="section-icon section-icon-os">
+                <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
             <div>
                 <div class="section-title">Operating System</div>
                 <div class="section-desc">Windows version, build, architecture and installation details</div>
@@ -701,7 +732,9 @@ $html = @"
     <!-- CPU -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-cpu">&#9881;</div>
+            <div class="section-icon section-icon-cpu">
+                <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+            </div>
             <div>
                 <div class="section-title">Processor</div>
                 <div class="section-desc">CPU model, frequency, core count and current load</div>
@@ -719,7 +752,9 @@ $html = @"
     <!-- RAM -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-ram">&#128190;</div>
+            <div class="section-icon section-icon-ram">
+                <svg viewBox="0 0 24 24"><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z"/><line x1="6" y1="9" x2="6" y2="13"/><line x1="10" y1="9" x2="10" y2="13"/><line x1="14" y1="9" x2="14" y2="13"/><line x1="18" y1="9" x2="18" y2="13"/><line x1="6" y1="19" x2="6" y2="21"/><line x1="10" y1="19" x2="10" y2="21"/><line x1="14" y1="19" x2="14" y2="21"/><line x1="18" y1="19" x2="18" y2="21"/></svg>
+            </div>
             <div>
                 <div class="section-title">Memory (RAM)</div>
                 <div class="section-desc">Physical memory usage and installed modules</div>
@@ -746,9 +781,11 @@ $html = @"
     <!-- DISK LOGICAL -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-disk">&#128194;</div>
+            <div class="section-icon section-icon-disk">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="7" y1="8" x2="7.01" y2="8"/><line x1="7" y1="16" x2="7.01" y2="16"/></svg>
+            </div>
             <div>
-                <div class="section-title">Storage — Logical Volumes</div>
+                <div class="section-title">Storage - Logical Volumes</div>
                 <div class="section-desc">Disk usage per drive letter and filesystem type</div>
             </div>
         </div>
@@ -763,9 +800,11 @@ $html = @"
     <!-- DISK PHYSICAL -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-disk">&#128290;</div>
+            <div class="section-icon section-icon-disk">
+                <svg viewBox="0 0 24 24"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>
+            </div>
             <div>
-                <div class="section-title">Storage — Physical Drives</div>
+                <div class="section-title">Storage - Physical Drives</div>
                 <div class="section-desc">Hardware disk drives detected, interface type and reported health status</div>
             </div>
         </div>
@@ -780,7 +819,9 @@ $html = @"
     <!-- GPU -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-gpu">&#127918;</div>
+            <div class="section-icon section-icon-gpu">
+                <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h4v6H6z"/><circle cx="16" cy="12" r="3"/><line x1="6" y1="19" x2="6" y2="22"/><line x1="10" y1="19" x2="10" y2="22"/><line x1="14" y1="19" x2="14" y2="22"/></svg>
+            </div>
             <div>
                 <div class="section-title">Graphics (GPU)</div>
                 <div class="section-desc">Video adapters, VRAM and driver versions</div>
@@ -797,7 +838,9 @@ $html = @"
     <!-- NETWORK -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-net">&#127760;</div>
+            <div class="section-icon section-icon-net">
+                <svg viewBox="0 0 24 24"><rect x="2" y="2" width="6" height="6" rx="1"/><rect x="16" y="2" width="6" height="6" rx="1"/><rect x="9" y="16" width="6" height="6" rx="1"/><path d="M5 8v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><line x1="12" y1="13" x2="12" y2="16"/></svg>
+            </div>
             <div>
                 <div class="section-title">Network Adapters</div>
                 <div class="section-desc">Active network interfaces, IP addresses and DNS configuration</div>
@@ -814,7 +857,9 @@ $html = @"
     <!-- SERVICES -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-svc">&#9881;</div>
+            <div class="section-icon section-icon-svc">
+                <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="4"/></svg>
+            </div>
             <div>
                 <div class="section-title">Critical Windows Services</div>
                 <div class="section-desc">Status of essential system services required for stable operation</div>
@@ -831,7 +876,9 @@ $html = @"
     <!-- SECURITY -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-sec">&#128274;</div>
+            <div class="section-icon section-icon-sec">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+            </div>
             <div>
                 <div class="section-title">Security Status</div>
                 <div class="section-desc">Windows Defender, antivirus definitions and pending updates</div>
@@ -852,7 +899,9 @@ $html = @"
     <!-- SRTTRAIL -->
     <div class="section">
         <div class="section-header">
-            <div class="section-icon section-icon-log">&#128220;</div>
+            <div class="section-icon section-icon-log">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            </div>
             <div>
                 <div class="section-title">Startup Repair Log (SrtTrail.txt)</div>
                 <div class="section-desc">Last 20 lines from the Windows startup diagnosis log</div>
@@ -864,7 +913,7 @@ $html = @"
 </div>
 
 <footer class="footer">
-    <div class="footer-brand">Generated by <span>Secret-Tools</span> &nbsp;·&nbsp; mrsecret_official &nbsp;·&nbsp; All data collected locally</div>
+    <div class="footer-brand">Generated by <span>Secret-Tools</span> &bull; mrsecret_official &bull; All data collected locally</div>
     <div class="footer-date">$reportDate</div>
 </footer>
 
@@ -876,7 +925,7 @@ $html = @"
 # OUTPUT
 # ──────────────────────────────────────────────
 try {
-    $html | Out-File -FilePath $OutputPath -Force -Encoding UTF8
+    [System.IO.File]::WriteAllText($OutputPath, $html, [System.Text.Encoding]::UTF8)
     Write-Host ""
     Write-Host "${creamyGreen}[OK] Health report generated successfully.${reset}"
     Write-Host "     Path: ${creamyCyan}$OutputPath${reset}"
