@@ -24,8 +24,8 @@ $reset        = "$esc[0m"
 
 if (-not $OutputPath) {
     $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $desktopPath = [Environment]::GetFolderPath('Desktop')
-    $reportDir = "$([Environment]::GetFolderPath('UserProfile'))\Tools\reports"
+    $docsFolder = [Environment]::GetFolderPath('MyDocuments')
+    $reportDir = "$docsFolder\Secret-Tools\Reports"
     if (-not (Test-Path $reportDir)) { New-Item -ItemType Directory -Path $reportDir -Force | Out-Null }
     $OutputPath = "$reportDir\SecretTools_HealthReport_$timestamp.html"
 }

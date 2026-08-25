@@ -291,7 +291,8 @@ function Check-IsAdmin {
 
 function Write-AssistantLog([string]$action, [string]$status, [string]$details) {
     try {
-        $logDir = "$installDir\logs"
+        $docsFolder = [Environment]::GetFolderPath('MyDocuments')
+        $logDir = if ($docsFolder) { "$docsFolder\Secret-Tools\Logs" } else { "$installDir\logs" }
         if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force -ErrorAction SilentlyContinue | Out-Null }
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         "[$timestamp] [$status] - $action : $details" | Out-File -FilePath "$logDir\assistant_actions.log" -Append -Encoding UTF8 -ErrorAction SilentlyContinue
@@ -741,7 +742,9 @@ function Assistant-ViewLogs {
     Invoke-AssistantHeader "ASSISTANT: REPAIR HISTORY & ERROR LOGS" "Displays logged repair operations and recent Windows startup error traces."
 
     Write-Host "${creamyYellow}--- Secret-Tools Action History ---${reset}"
-    $histLog = "$installDir\logs\assistant_actions.log"
+    $docsFolder = [Environment]::GetFolderPath('MyDocuments')
+    $histLog = "$docsFolder\Secret-Tools\Logs\assistant_actions.log"
+    if (-not (Test-Path $histLog)) { $histLog = "$installDir\logs\assistant_actions.log" }
     if (Test-Path $histLog) {
         Get-Content $histLog -Tail 15 | ForEach-Object { Write-Host "   $_" }
     } else {
