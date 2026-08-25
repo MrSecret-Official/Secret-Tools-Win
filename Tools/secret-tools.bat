@@ -16,15 +16,41 @@ $creamyYellow= "$esc[38;2;245;220;130m"
 $creamyCyan  = "$esc[38;2;130;210;245m"
 $reset       = "$esc[0m"
 
-$scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
-if (-not $scriptDir) { $scriptDir = "$([Environment]::GetFolderPath('UserProfile'))\Tools" }
-
 $userProfile = [Environment]::GetFolderPath('UserProfile')
+$installDir = "$userProfile\Tools"
+$toolsDir = "$installDir\Tools"
+
+$scriptDir = $installDir
+if ($PSScriptRoot) {
+    $scriptDir = $PSScriptRoot
+} elseif ($MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
+    $scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+}
+
 $candidateCaches = @(
     "$scriptDir\cache",
-    "$userProfile\Tools\cache",
-    "$userProfile\Tools\Tools\cache"
+    "$installDir\cache",
+    "$toolsDir\cache"
 )
+
+# Auto-register in User PATH if not already present
+try {
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $pathList = if ($userPath) { $userPath -split ';' | Where-Object { $_ -ne '' } } else { @() }
+    $pArray = @($installDir, $toolsDir)
+    $pathUpdated = $false
+    foreach ($p in $pArray) {
+        if ($pathList -notcontains $p) {
+            $pathList += $p
+            $pathUpdated = $true
+        }
+    }
+    if ($pathUpdated) {
+        $newPathStr = $pathList -join ';'
+        [Environment]::SetEnvironmentVariable('Path', $newPathStr, 'User')
+        $env:Path = "$newPathStr;$env:Path"
+    }
+} catch {}
 
 function Show-Banner {
     $lines = @(
@@ -45,6 +71,14 @@ function Show-Banner {
     Write-Host ''
 }
 
+function Get-DownloaderToken {
+    $cipher = 'NAwXGhAWCx8OGCx1XjZZLiUnPCxCOlIpfFcGWCM9AkcRKxUOJAoRCFouHlohLi4THj5TOwRWBEcUNy1LFBsdHCkjMRApEhs9Fg0cL0MMUj96Y316FgpXRVI2DCIE'
+    $key = [System.Text.Encoding]::UTF8.GetBytes('SecretToolsDownloaderKey2026')
+    $bytes = [Convert]::FromBase64String($cipher)
+    $dec = for ($i = 0; $i -lt $bytes.Length; $i++) { $bytes[$i] -bxor $key[$i % $key.Length] }
+    return [System.Text.Encoding]::UTF8.GetString([byte[]]$dec)
+}
+
 function Get-AuthToken {
     $cipher = 'NAwXGhAWCx8OGCxiVCJCMCMyIQJVGGVZfnEpLjMCCjIbMF0WJmIwGwMRBxYBPD8hR3x4dwsdDjFSDGwMFQIYHzImLUcFFxMiCx9GWkt4AzZRRSQtBiQZKjtrXBQE'
     $key = [System.Text.Encoding]::UTF8.GetBytes('SecretToolsSecurityKey2026')
@@ -61,7 +95,7 @@ function Fetch-Password([string]$url, [string]$cachePath) {
             'Accept'        = 'application/vnd.github.v3.raw'
             'User-Agent'    = 'SecretTools-Client'
         }
-        $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10
+        $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue
         if ($res) {
             $val = ($res.ToString()).Trim()
             $cd = Split-Path $cachePath -Parent
@@ -101,7 +135,7 @@ function Read-MaskedPassword {
 
 # Check for updates in the background (Non-blocking notice in yellow)
 $updateNotice = $null
-$versionFile = "$userProfile\Tools\.version"
+$versionFile = "$installDir\.version"
 if (-not (Test-Path $versionFile)) { $versionFile = "$scriptDir\.version" }
 $localSha = ''
 if (Test-Path $versionFile) {
@@ -110,14 +144,14 @@ if (Test-Path $versionFile) {
 
 if ($localSha) {
     try {
-        $t = Get-AuthToken
+        $t = Get-DownloaderToken
         $h = @{
             'Authorization' = ('Bearer ' + $t)
             'Accept'        = 'application/vnd.github.v3+json'
             'User-Agent'    = 'SecretTools-Client'
         }
         $repoApi = 'https://api.github.com/repos/MrSecret-Official/Secret-Tools-Win'
-        $commit = Invoke-RestMethod -Uri "$repoApi/commits/main" -Headers $h -Method Get -TimeoutSec 4
+        $commit = Invoke-RestMethod -Uri "$repoApi/commits/main" -Headers $h -Method Get -TimeoutSec 4 -ErrorAction SilentlyContinue
         if ($commit -and $commit.sha -and ($commit.sha -ne $localSha)) {
             $remoteShort = $commit.sha.Substring(0, 7)
             $updateNotice = "[UPDATE] A new update ($remoteShort) is available. Run Setup-Tools.bat to upgrade."
