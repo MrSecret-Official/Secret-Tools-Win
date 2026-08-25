@@ -1,0 +1,17 @@
+
+# Cache files (contains passwords)
+cache/
+*.cache
+
+# Logs
+logs/*
+!logs/.gitkeep
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+~$*
+
+# Local configuration
+config.local.ini
