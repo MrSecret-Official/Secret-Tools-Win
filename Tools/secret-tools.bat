@@ -10,15 +10,6 @@ set "IS_WINRE=0"
 if /i "%SystemDrive%"=="X:" set "IS_WINRE=1"
 if exist "X:\Windows\System32" set "IS_WINRE=1"
 
-:: Auto-elevate to Administrator in normal Windows if not already elevated
-if "%IS_WINRE%"=="0" (
-    net session >nul 2>&1
-    if !errorlevel! neq 0 (
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
-        exit /b
-    )
-)
-
 :: Detect target installed Windows drive (C:, D:, E:, F:, etc.)
 set "WIN_DRIVE="
 for %%d in (C D E F G H I) do (
@@ -30,14 +21,14 @@ for %%d in (C D E F G H I) do (
 )
 if not defined WIN_DRIVE set "WIN_DRIVE=%SystemDrive%"
 
-:: Try launching PowerShell engine
+:: Launch PowerShell engine smoothly
 where powershell >nul 2>&1
 if %errorlevel% equ 0 (
     powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:SECRET_TOOLS_WINRE='%IS_WINRE%'; $env:SECRET_TOOLS_WINDRIVE='%WIN_DRIVE%'; & ([ScriptBlock]::Create((Get-Content -LiteralPath '%~f0' -Raw)))"
-    if !errorlevel! equ 0 exit /b 0
+    exit /b %errorlevel%
 )
 
-:: PURE BATCH WINRE EMERGENCY ENGINE (Runs if PowerShell is missing or fails in WinRE)
+:: PURE BATCH WINRE EMERGENCY ENGINE (Runs only if PowerShell is unavailable in WinRE)
 :WINRE_BATCH_ENGINE
 cls
 echo.
@@ -463,22 +454,6 @@ function Invoke-AssistantHeader([string]$title, [string]$description) {
     Write-Host ''
 }
 
-function Request-AdminElevation {
-    if ($isWinRE) { return $true }
-    if (-not (Check-IsAdmin)) {
-        Write-Host "${creamyYellow}[SECURITY NOTICE] This action requires elevated Administrator privileges.${reset}"
-        Write-Host "Relaunch Secret-Tools with Administrator privileges? (Y/N): " -NoNewline
-        $ans = Read-Host
-        if ($ans -match '^[YySs]') {
-            $batPath = if (Test-Path "$toolsDir\secret-tools.bat") { "$toolsDir\secret-tools.bat" } else { "$installDir\secret-tools.bat" }
-            Start-Process -FilePath "$batPath" -Verb RunAs
-            exit 0
-        }
-        return $false
-    }
-    return $true
-}
-
 # 1. GUIDED INTELLIGENT SYSTEM DIAGNOSIS
 function Assistant-SmartDiagnosis {
     Invoke-AssistantHeader "INTELLIGENT ASSISTANT: COMPREHENSIVE SYSTEM DIAGNOSIS" "The assistant will scan critical Windows components and propose tailored repairs."
@@ -634,8 +609,6 @@ function Apply-SmartFixes([array]$issues) {
 # 2. STARTUP & SRTTRAIL REPAIR
 function Assistant-BootRepair {
     Invoke-AssistantHeader "ASSISTANT: STARTUP & SRTTRAIL.TXT REPAIR" "Resolves Automatic Repair boot loops and rebuilds the BCD boot store."
-    
-    if (-not (Request-AdminElevation)) { return }
 
     Create-SafeRestorePoint
 
@@ -682,8 +655,6 @@ function Assistant-BootRepair {
 function Assistant-ImageRepair {
     Invoke-AssistantHeader "ASSISTANT: DEEP SYSTEM FILES & IMAGE REPAIR" "Scans and replaces any corrupted or modified core Windows files."
 
-    if (-not (Request-AdminElevation)) { return }
-
     Create-SafeRestorePoint
 
     if ($isWinRE) {
@@ -718,8 +689,6 @@ function Assistant-ImageRepair {
 function Assistant-DiskRepair {
     Invoke-AssistantHeader "ASSISTANT: DISK & BAD SECTOR REPAIR" "Inspects NTFS filesystem integrity and repairs disk errors."
 
-    if (-not (Request-AdminElevation)) { return }
-
     Write-Host "Detected storage volume: $targetWinDrive"
     Write-Host ''
     if ($isWinRE) {
@@ -752,8 +721,6 @@ function Assistant-NetworkRepair {
         [void][Console]::ReadLine()
         return
     }
-
-    if (-not (Request-AdminElevation)) { return }
 
     Write-Host "${creamyCyan}[1/5] Resetting Winsock catalog...${reset}"
     netsh winsock reset | Out-Null
@@ -799,8 +766,6 @@ function Assistant-WindowsUpdateRepair {
         return
     }
 
-    if (-not (Request-AdminElevation)) { return }
-
     Create-SafeRestorePoint
 
     Write-Host "${creamyCyan}[1/4] Stopping Windows Update and Transfer services...${reset}"
@@ -844,8 +809,6 @@ function Assistant-WindowsUpdateRepair {
 # 7. EMERGENCY ACCESS ACCOUNTS
 function Assistant-EmergencyAccount {
     Invoke-AssistantHeader "ASSISTANT: EMERGENCY ACCESS ACCOUNTS" "Enables built-in administration accounts to recover computer access."
-
-    if (-not (Request-AdminElevation)) { return }
 
     Write-Host "  [1] Enable Windows built-in Administrator account"
     Write-Host "  [2] Create a new Emergency Administrator user"

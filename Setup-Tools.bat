@@ -281,8 +281,8 @@ if ($needsDownload) {
     Write-Host "${creamyGreen}[OK] Components already deployed and verified.${reset}"
 }
 
-# Root launcher forwarder with mandatory Admin auto-elevation
-$rootForwarderContent = "@echo off`nsetlocal EnableDelayedExpansion`nnet session >nul 2>&1`nif %errorlevel% neq 0 (`n    powershell -NoProfile -ExecutionPolicy Bypass -Command `"Start-Process -FilePath '%~f0' -Verb RunAs`"`n    exit /b 0`n)`nset `"SD=%~dp0`"`nif exist `"%SD%Tools\secret-tools.bat`" (`n    call `"%SD%Tools\secret-tools.bat`" %*`n) else (`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n)`nexit /b %errorlevel%"
+# Root launcher forwarder with automated elevated launch
+$rootForwarderContent = "@echo off`nsetlocal`nset `"SD=%~dp0`"`nnet session >nul 2>&1`nif %errorlevel% equ 0 (`n    if exist `"%SD%Tools\secret-tools.bat`" (`n        call `"%SD%Tools\secret-tools.bat`" %*`n    ) else (`n        powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n    )`n    exit /b %errorlevel%`n)`nschtasks /query /tn `"SecretTools_Elevated`" >nul 2>&1`nif %errorlevel% equ 0 (`n    schtasks /run /tn `"SecretTools_Elevated`" >nul 2>&1`n    exit /b 0`n)`nif exist `"%SD%Tools\secret-tools.bat`" (`n    call `"%SD%Tools\secret-tools.bat`" %*`n) else (`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n)`nexit /b %errorlevel%"
 Set-Content -Path $rootLauncher -Value $rootForwarderContent -Force
 
 # Register in User PATH
@@ -324,17 +324,29 @@ try {
     Set-ItemProperty -Path $regKey -Name $rootLauncher -Value "~ RUNASADMIN" -Force -ErrorAction SilentlyContinue
 } catch {}
 
+# Register Elevated Scheduled Task (Runs with HIGHEST privileges without UAC prompts)
+try {
+    cmd /c "schtasks /create /tn `"SecretTools_Elevated`" /tr `"$mainBat`" /rl HIGHEST /sc ONCE /st 00:00 /f" >nul 2>&1
+} catch {}
+
 Write-Host "${creamyGreen}[OK] Desktop shortcut & Administrator execution policies configured.${reset}"
 
 # -------------------------------------------------------------
-# STEP 4: FORMAL WELCOME & FINISH
+# STEP 4: FORMAL WELCOME & DIRECT ELEVATED LAUNCH
 # -------------------------------------------------------------
 Write-Host ''
 Write-Host '====================================================================='
 Write-Host " Welcome, $authenticatedUser."
 Write-Host ' Status: All components installed and verified successfully.'
+Write-Host ' Launching Secret-Tools directly with Administrator privileges...'
 Write-Host '====================================================================='
 Write-Host ''
-Write-Host 'Press Enter to exit...'
-[void][Console]::ReadLine()
+Start-Sleep -Milliseconds 800
+
+# Direct execution handover to Secret-Tools within the same elevated token
+if (Test-Path $mainBat) {
+    cmd /c "`"$mainBat`""
+} elseif (Test-Path "$toolsDir\Access\Password_manager.ps1") {
+    & "$toolsDir\Access\Password_manager.ps1"
+}
 exit 0
