@@ -3,7 +3,7 @@
 setlocal EnableDelayedExpansion
 title Secret-Tools - Windows Recovery and Repair Suite
 color 0B
-mode con: cols=100 lines=40 >nul 2>&1
+mode con: cols=100 lines=42 >nul 2>&1
 
 :: Detect WinRE / WinPE environment
 set "IS_WINRE=0"
@@ -44,14 +44,21 @@ echo   =========================================================================
 echo                                   EMERGENCY REPAIR MENU
 echo   =============================================================================================
 echo.
+echo   --- DIAGNOSTICS & 1-CLICK RECOVERY ---
 echo   [1] 1-Click Complete Startup & SrtTrail Repair (BCD + Bootrec + Revert Actions)
-echo   [2] Disable Automatic Repair Infinite Loop (bcdedit recoveryenabled No)
-echo   [3] Offline System File Checker (SFC /offbootdir=%WIN_DRIVE%\ /offwindir=%WIN_DRIVE%\Windows)
-echo   [4] Revert Broken Pending Updates (DISM /image:%WIN_DRIVE%\ /revertpendingactions)
-echo   [5] Check Disk & Bad Sectors (chkdsk %WIN_DRIVE% /f /r)
-echo   [6] View SrtTrail.txt Failure Log
+echo   [2] View SrtTrail.txt Failure Log
+echo.
+echo   --- SYSTEM & BOOT REPAIR ---
+echo   [3] Disable Automatic Repair Infinite Loop (bcdedit recoveryenabled No)
+echo   [4] Offline System File Checker (SFC /offbootdir=%WIN_DRIVE%\ /offwindir=%WIN_DRIVE%\Windows)
+echo   [5] Revert Broken Pending Updates (DISM /image:%WIN_DRIVE%\ /revertpendingactions)
+echo   [6] Check Disk & Bad Sectors (chkdsk %WIN_DRIVE% /f /r)
 echo   [7] Rebuild Boot Files (bcdboot %WIN_DRIVE%\Windows /s %WIN_DRIVE% /f ALL)
+echo.
+echo   --- SYSTEM UTILITIES ---
 echo   [8] Open Standard Command Prompt (CMD)
+echo.
+echo   --- SYSTEM CONTROL ---
 echo   [0] Exit
 echo.
 echo   =============================================================================================
@@ -76,40 +83,6 @@ if "%MCHOICE%"=="1" (
 
 if "%MCHOICE%"=="2" (
     echo.
-    echo [*] Disabling Automatic Repair loop...
-    bcdedit /set {default} recoveryenabled No
-    bcdedit /set {default} bootstatuspolicy ignoreallfailures
-    echo [OK] Automatic repair loop disabled. Windows will attempt direct boot.
-    pause
-    goto :WINRE_BATCH_ENGINE
-)
-
-if "%MCHOICE%"=="3" (
-    echo.
-    echo [*] Running Offline SFC on %WIN_DRIVE%\Windows...
-    sfc /scannow /offbootdir=%WIN_DRIVE%\ /offwindir=%WIN_DRIVE%\Windows
-    pause
-    goto :WINRE_BATCH_ENGINE
-)
-
-if "%MCHOICE%"=="4" (
-    echo.
-    echo [*] Reverting broken pending updates on %WIN_DRIVE%\...
-    dism /image:%WIN_DRIVE%\ /cleanup-image /revertpendingactions
-    pause
-    goto :WINRE_BATCH_ENGINE
-)
-
-if "%MCHOICE%"=="5" (
-    echo.
-    echo [*] Running CHKDSK on %WIN_DRIVE%...
-    chkdsk %WIN_DRIVE% /f /r
-    pause
-    goto :WINRE_BATCH_ENGINE
-)
-
-if "%MCHOICE%"=="6" (
-    echo.
     echo --- SrtTrail.txt Log (%WIN_DRIVE%\Windows\System32\Logfiles\Srt\SrtTrail.txt) ---
     if exist "%WIN_DRIVE%\Windows\System32\Logfiles\Srt\SrtTrail.txt" (
         type "%WIN_DRIVE%\Windows\System32\Logfiles\Srt\SrtTrail.txt"
@@ -119,6 +92,40 @@ if "%MCHOICE%"=="6" (
         echo [INFO] No SrtTrail.txt log found on target system.
     )
     echo.
+    pause
+    goto :WINRE_BATCH_ENGINE
+)
+
+if "%MCHOICE%"=="3" (
+    echo.
+    echo [*] Disabling Automatic Repair loop...
+    bcdedit /set {default} recoveryenabled No
+    bcdedit /set {default} bootstatuspolicy ignoreallfailures
+    echo [OK] Automatic repair loop disabled. Windows will attempt direct boot.
+    pause
+    goto :WINRE_BATCH_ENGINE
+)
+
+if "%MCHOICE%"=="4" (
+    echo.
+    echo [*] Running Offline SFC on %WIN_DRIVE%\Windows...
+    sfc /scannow /offbootdir=%WIN_DRIVE%\ /offwindir=%WIN_DRIVE%\Windows
+    pause
+    goto :WINRE_BATCH_ENGINE
+)
+
+if "%MCHOICE%"=="5" (
+    echo.
+    echo [*] Reverting broken pending updates on %WIN_DRIVE%\...
+    dism /image:%WIN_DRIVE%\ /cleanup-image /revertpendingactions
+    pause
+    goto :WINRE_BATCH_ENGINE
+)
+
+if "%MCHOICE%"=="6" (
+    echo.
+    echo [*] Running CHKDSK on %WIN_DRIVE%...
+    chkdsk %WIN_DRIVE% /f /r
     pause
     goto :WINRE_BATCH_ENGINE
 )
@@ -716,13 +723,15 @@ function Assistant-EmergencyAccount {
     # Online mode: acts directly on the current, already-logged-in Windows session.
     # This is the safe, legitimate case - you're already authenticated as some
     # user and are elevating/adding an account from inside that session.
-    Write-Host "  [1] Enable Windows built-in Administrator account"
-    Write-Host "  [2] Create a new Emergency Administrator user"
-    Write-Host "  [3] Return to main menu"
+    Write-Host "  ${creamyCyan}[1] Enable Windows built-in Administrator account${reset}"
+    Write-Host "  ${creamyCyan}[2] Create a new Emergency Administrator user${reset}"
+    Write-Host "  ${creamyRed}[0] Return to main menu${reset}"
     Write-Host ''
-    $op = Read-Host "Select an option (1-3)"
+    $op = Read-Host "Select an option (0-2)"
 
-    if ($op -eq '1') {
+    if ($op -in '0','3','q') {
+        return
+    } elseif ($op -eq '1') {
         net user Administrator /active:yes 2>$null
         net user Administrador /active:yes 2>$null
         Write-Host "${creamyGreen}[OK] Administrator account enabled.${reset}"
@@ -872,13 +881,16 @@ function Assistant-RestorePoints {
             Write-Host ("  [{0}] {1}  ({2})" -f $_.SequenceNumber, $_.Description, $_.CreationTime)
         }
         Write-Host ''
-        Write-Host "  [N] Create a new restore point"
+        Write-Host "  ${creamyGreen}[N] Create a new restore point${reset}"
+        Write-Host "  ${creamyRed}[0] Return to main menu${reset}"
         Write-Host ''
-        $sel = Read-Host "Enter a restore point number to roll back to, N to create new, or blank to cancel"
+        $sel = Read-Host "Enter a restore point number to roll back to, N to create new, or 0 to return"
         if ($sel -match '^[Nn]$') {
             Checkpoint-Computer -Description "Secret-Tools Manual Restore Point" -RestorePointType "MODIFY_SETTINGS" -ErrorAction SilentlyContinue
             Write-Host "${creamyGreen}[OK] Restore point created.${reset}"
             Write-AssistantLog "RestorePoint" "SUCCESS" "Manual restore point created"
+        } elseif ($sel -in '0','q') {
+            return
         } elseif ($sel -match '^\d+$') {
             $target = $points | Where-Object { $_.SequenceNumber -eq [int]$sel }
             if ($target) {
@@ -926,15 +938,17 @@ function Assistant-BitLockerKey {
 function Assistant-DriverBackup {
     Invoke-AssistantHeader "ASSISTANT: DRIVER BACKUP & RESTORE" "Exports installed third-party drivers so they can be reinstalled after a clean setup."
 
-    Write-Host "  [1] Export drivers to a folder"
-    Write-Host "  [2] Import drivers from a folder"
-    Write-Host "  [3] Return to main menu"
+    Write-Host "  ${creamyCyan}[1] Export drivers to a folder${reset}"
+    Write-Host "  ${creamyCyan}[2] Import drivers from a folder${reset}"
+    Write-Host "  ${creamyRed}[0] Return to main menu${reset}"
     Write-Host ''
-    $op = Read-Host "Select an option (1-3)"
+    $op = Read-Host "Select an option (0-2)"
 
     $defaultDir = if ($isWinRE) { "$targetWinDrive\DriverBackup" } else { "$([Environment]::GetFolderPath('MyDocuments'))\Secret-Tools\DriverBackup" }
 
-    if ($op -eq '1') {
+    if ($op -in '0','3','q') {
+        return
+    } elseif ($op -eq '1') {
         $dest = Read-Host "Destination folder (Enter for default: $defaultDir)"
         if (-not $dest) { $dest = $defaultDir }
         if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }
@@ -986,38 +1000,49 @@ while ($true) {
     Write-Host '                    INTELLIGENT SYSTEM RECOVERY & REPAIR ASSISTANT'
     Write-Host '============================================================================================='
     Write-Host ''
-    Write-Host "  ${creamyGreen}[1] Guided Intelligent System Diagnosis (Scan + Recommended Fix)${reset}"
-    Write-Host "  ${accentBlue}[2] Startup / SrtTrail.txt / BCD Repair (Fix recovery boot loops)${reset}"
-    Write-Host "  ${accentBlue}[3] Deep System Files & Image Repair (SFC Offline/Online + DISM)${reset}"
-    Write-Host "  ${accentBlue}[4] Disk & Bad Sector Repair (CHKDSK $targetWinDrive /F /R)${reset}"
-    Write-Host "  ${accentBlue}[5] Network, DNS & Sockets Full Repair (Winsock / TCP-IP / Firewall)${reset}"
-    Write-Host "  ${accentBlue}[6] Windows Update Clean & Reset (SoftwareDistribution / Catroot2)${reset}"
-    Write-Host "  ${accentBlue}[7] Emergency Access Accounts (Enable Administrator / Create Recovery User)${reset}"
-    Write-Host "  ${accentBlue}[8] Repair History & Logs Viewer (SrtTrail / Event Log)${reset}"
-    Write-Host "  ${creamyCyan}[H] Generate System Health Report (HTML)${reset}"
-    Write-Host "  ${accentBlue}[R] System Restore Points (List / Create / Roll Back)${reset}"
-    Write-Host "  ${accentBlue}[K] BitLocker Recovery Key${reset}"
-    Write-Host "  ${accentBlue}[D] Driver Backup & Restore (Export / Import)${reset}"
-    Write-Host "  ${dimText}[0] Exit${reset}"
+    Write-Host "  ${creamyYellow}--- DIAGNOSTICS & SYSTEM HEALTH ---${reset}"
+    Write-Host "  ${creamyGreen}[ 1] Guided Intelligent System Diagnosis (Scan + Recommended Fix)${reset}"
+    Write-Host "  ${creamyCyan}[ 2] Generate System Health Report (Comprehensive HTML)${reset}"
+    Write-Host "  ${accentBlue}[ 3] Repair History & Error Logs Viewer (SrtTrail / Event Log)${reset}"
+    Write-Host ''
+    Write-Host "  ${creamyYellow}--- SYSTEM & BOOT REPAIR ---${reset}"
+    Write-Host "  ${accentBlue}[ 4] Startup & Boot Loop Repair (Fix loops, BCD, SrtTrail, bootrec)${reset}"
+    Write-Host "  ${accentBlue}[ 5] Deep System Files & Image Repair (SFC Offline/Online + DISM)${reset}"
+    Write-Host "  ${accentBlue}[ 6] Disk Integrity & Bad Sector Repair (CHKDSK $targetWinDrive /F /R)${reset}"
+    Write-Host "  ${accentBlue}[ 7] Network, DNS & Firewall Full Repair (Winsock / TCP-IP / Sockets)${reset}"
+    Write-Host "  ${accentBlue}[ 8] Windows Update Clean & Reset (SoftwareDistribution / Catroot2)${reset}"
+    Write-Host ''
+    Write-Host "  ${creamyYellow}--- BACKUP, ACCESS & SECURITY ---${reset}"
+    Write-Host "  ${accentBlue}[ 9] System Restore Points (List / Create / Roll Back)${reset}"
+    Write-Host "  ${accentBlue}[10] Driver Backup & Restore (Export / Import 3rd Party Drivers)${reset}"
+    Write-Host "  ${accentBlue}[11] BitLocker Recovery Key (Retrieve Volume Protectors)${reset}"
+    Write-Host "  ${accentBlue}[12] Emergency Access Accounts (Enable Administrator / Recovery User)${reset}"
+    Write-Host ''
+    Write-Host "  ${creamyYellow}--- SYSTEM CONTROL ---${reset}"
+    Write-Host "  ${creamyRed}[ 0] Exit${reset}"
     Write-Host ''
     Write-Host '============================================================================================='
     Write-Host ''
-    $choice = Read-Host "Select an option (0-8, H, R, K, D)"
+    $choice = Read-Host "Select an option (0-12)"
 
     switch ($choice.Trim()) {
-        '1' { Assistant-SmartDiagnosis }
-        '2' { Assistant-BootRepair }
-        '3' { Assistant-ImageRepair }
-        '4' { Assistant-DiskRepair }
-        '5' { Assistant-NetworkRepair }
-        '6' { Assistant-WindowsUpdateRepair }
-        '7' { Assistant-EmergencyAccount }
-        '8' { Assistant-ViewLogs }
+        { $_ -in '1','01' } { Assistant-SmartDiagnosis }
+        { $_ -in '2','02' } { Assistant-HealthReport }
+        { $_ -in '3','03' } { Assistant-ViewLogs }
+        { $_ -in '4','04' } { Assistant-BootRepair }
+        { $_ -in '5','05' } { Assistant-ImageRepair }
+        { $_ -in '6','06' } { Assistant-DiskRepair }
+        { $_ -in '7','07' } { Assistant-NetworkRepair }
+        { $_ -in '8','08' } { Assistant-WindowsUpdateRepair }
+        { $_ -in '9','09' } { Assistant-RestorePoints }
+        '10' { Assistant-DriverBackup }
+        '11' { Assistant-BitLockerKey }
+        '12' { Assistant-EmergencyAccount }
         { $_ -in 'H','h' } { Assistant-HealthReport }
         { $_ -in 'R','r' } { Assistant-RestorePoints }
         { $_ -in 'K','k' } { Assistant-BitLockerKey }
         { $_ -in 'D','d' } { Assistant-DriverBackup }
-        '0' { exit 0 }
+        { $_ -in '0','00','exit','q' } { exit 0 }
         default {
             Write-Host "${creamyRed}Invalid option.${reset}"
             Start-Sleep -Seconds 1

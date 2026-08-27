@@ -69,7 +69,7 @@ automatically. No credentials involved at any point.
 
 - This repo is public and contains no secrets, tokens, or passwords — keep
   it that way. Never commit credentials into any file here.
-- `[7] Emergency Access Accounts` can enable the built-in Administrator
+- `[12] Emergency Access Accounts` can enable the built-in Administrator
   account or create a new local admin user, but **only from an already
   logged-in Windows session** — **only use it on a device you own or are
   explicitly authorized to administer.** If you're sharing this tool with
