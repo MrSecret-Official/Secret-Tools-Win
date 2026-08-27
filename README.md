@@ -17,6 +17,13 @@ token required. Just execute **`Setup-Tools.bat`**:
 Setup-Tools.bat
 ```
 
+Before it downloads or changes anything, it shows a plain-language notice of
+exactly what it does (the only network activity is downloading from this
+repo — no telemetry, no data collection), where it installs to, and asks you
+to confirm. Answering "N" installs nothing — and if Secret-Tools was already
+installed, removes it completely (files, PATH entries, shortcut) instead.
+This notice is shown every time the installer runs, not just the first time.
+
 This single script:
 - Fetches all required files from this public repository.
 - Installs the project into `%USERPROFILE%\Tools`.

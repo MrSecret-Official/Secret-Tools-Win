@@ -34,6 +34,7 @@ $creamyGreen = "$esc[38;2;145;225;165m"
 $creamyRed   = "$esc[38;2;235;120;120m"
 $creamyCyan  = "$esc[38;2;130;210;245m"
 $creamyYellow= "$esc[38;2;240;220;140m"
+$dimText     = "$esc[38;2;160;175;195m"
 $reset       = "$esc[0m"
 
 function Show-Banner {
@@ -56,17 +57,9 @@ function Show-Banner {
 }
 
 # -------------------------------------------------------------
-# STEP 1: INITIALIZE & CHECK REPOSITORY VERSION
-# The repository is public, so no GitHub token or account is needed to
-# install or update — just a plain, unauthenticated API call.
+# PATHS (computed up front so the consent notice below can show the real,
+# recognized install directory rather than a generic placeholder)
 # -------------------------------------------------------------
-Clear-Host
-Show-Banner
-Write-Host '============================================================================================='
-Write-Host '                              AUTOMATED INSTALLATION WIZARD'
-Write-Host '============================================================================================='
-Write-Host ''
-
 $headers = @{
     'Accept'     = 'application/vnd.github.v3+json'
     'User-Agent' = 'SecretTools-Installer'
@@ -79,6 +72,104 @@ $versionFile = "$installDir\.version"
 $mainBat = "$toolsDir\secret-tools.bat"
 $rootLauncher = "$installDir\secret-tools.bat"
 $repoApi = 'https://api.github.com/repos/MrSecret-Official/Secret-Tools-Win'
+$desktop = [Environment]::GetFolderPath('Desktop')
+$shortcutPath = "$desktop\Secret-Tools.lnk"
+
+# -------------------------------------------------------------
+# UNINSTALL: removes everything this installer creates, plus known leftovers
+# from older versions (scheduled task / registry hack that no longer exist
+# in this version, in case you're updating from one that had them).
+# -------------------------------------------------------------
+function Uninstall-SecretTools {
+    $wasInstalled = Test-Path $installDir
+    Write-Host "${creamyCyan}[*] Cleaning up...${reset}"
+
+    if ($wasInstalled) {
+        Remove-Item -Path $installDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path $shortcutPath) {
+        Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
+    }
+
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    if ($userPath) {
+        $cleaned = ($userPath -split ';' | Where-Object { $_ -ne '' -and $_ -ne $installDir -and $_ -ne $toolsDir }) -join ';'
+        if ($cleaned -ne $userPath) {
+            [Environment]::SetEnvironmentVariable('Path', $cleaned, 'User')
+        }
+    }
+
+    # Leftovers from older versions of this tool (harmless if they don't exist)
+    try { cmd /c 'schtasks /delete /tn "SecretTools_Elevated" /f' >nul 2>&1 } catch {}
+    try {
+        $regKey = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
+        if (Test-Path $regKey) {
+            Remove-ItemProperty -Path $regKey -Name $mainBat -ErrorAction SilentlyContinue
+            Remove-ItemProperty -Path $regKey -Name $rootLauncher -ErrorAction SilentlyContinue
+        }
+    } catch {}
+    if (Test-Path "$env:LOCALAPPDATA\Secret-Tools") {
+        Remove-Item -Path "$env:LOCALAPPDATA\Secret-Tools" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if ($wasInstalled) {
+        Write-Host "${creamyGreen}[OK] Secret-Tools has been fully removed. No files, PATH entries, or shortcuts remain.${reset}"
+    } else {
+        Write-Host "${creamyGreen}[OK] Nothing was installed - no changes were made to this computer.${reset}"
+    }
+}
+
+# -------------------------------------------------------------
+# STEP 1: CONSENT & TRANSPARENCY NOTICE
+# Shown before any network activity or file changes, every time this
+# installer runs (fresh install or update alike).
+# -------------------------------------------------------------
+Clear-Host
+Show-Banner
+Write-Host '============================================================================================='
+Write-Host '                              AUTOMATED INSTALLATION WIZARD'
+Write-Host '============================================================================================='
+Write-Host ''
+Write-Host "${dimText}Before anything is downloaded or changed, here is exactly what this does:${reset}"
+Write-Host ''
+Write-Host "${dimText}  - Network activity: downloads its own source files from the public GitHub${reset}"
+Write-Host "${dimText}    repo MrSecret-Official/Secret-Tools-Win. That is the ONLY network activity${reset}"
+Write-Host "${dimText}    this tool ever performs - no telemetry, no analytics, no personal data of${reset}"
+Write-Host "${dimText}    any kind is collected or sent anywhere, by this installer or by the tool.${reset}"
+Write-Host "${dimText}  - Privileges: requests Administrator rights next (Windows' own UAC prompt -${reset}"
+Write-Host "${dimText}    this cannot be skipped or hidden, by design).${reset}"
+Write-Host "${dimText}  - System changes: once installed, its menu can modify boot configuration,${reset}"
+Write-Host "${dimText}    run SFC/DISM, reset network settings, manage local user accounts, read${reset}"
+Write-Host "${dimText}    BitLocker recovery keys, and back up/restore drivers - only when YOU pick${reset}"
+Write-Host "${dimText}    that option from the menu; nothing runs on its own in the background.${reset}"
+Write-Host "${dimText}  - Install location: ${reset}${creamyCyan}$installDir${reset}"
+Write-Host "${dimText}    (added to your user PATH; a desktop shortcut is created there too).${reset}"
+Write-Host ''
+Write-Host "${dimText}Every line of source is on GitHub - read it before you trust it:${reset}"
+Write-Host "${creamyCyan}https://github.com/MrSecret-Official/Secret-Tools-Win${reset}"
+Write-Host ''
+Write-Host '============================================================================================='
+Write-Host ''
+Write-Host "Continue with the download and installation? (Y/N)"
+Write-Host "${dimText}  N = nothing is installed (and if Secret-Tools is already installed, it is${reset}"
+Write-Host "${dimText}      removed automatically and completely - files, PATH entries, shortcut).${reset}"
+Write-Host ''
+$consent = Read-Host "Your choice"
+if ($consent -notmatch '^[YySs]') {
+    Write-Host ''
+    Uninstall-SecretTools
+    Write-Host ''
+    Write-Host 'Press Enter to exit...'
+    [void][Console]::ReadLine()
+    exit 0
+}
+
+# -------------------------------------------------------------
+# STEP 2: CHECK REPOSITORY VERSION
+# The repository is public, so no GitHub token or account is needed to
+# install or update — just a plain, unauthenticated API call.
+# -------------------------------------------------------------
+Write-Host ''
 
 # Ensure required directories
 if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir -Force | Out-Null }
@@ -116,7 +207,7 @@ if ($needsDownload -and $remoteSha) {
 }
 
 # -------------------------------------------------------------
-# STEP 2: PERFORM DOWNLOAD / UPDATE & DEPLOYMENT
+# STEP 3: PERFORM DOWNLOAD / UPDATE & DEPLOYMENT
 # -------------------------------------------------------------
 Write-Host ''
 if ($needsDownload) {
@@ -184,8 +275,6 @@ if ($pathUpdated) {
 # shortcut only makes Windows show its normal UAC consent prompt as soon
 # as you double-click it — it does not skip or suppress that prompt.
 $ws = New-Object -ComObject WScript.Shell
-$desktop = [Environment]::GetFolderPath('Desktop')
-$shortcutPath = "$desktop\Secret-Tools.lnk"
 $shortcut = $ws.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $mainBat
 $shortcut.WorkingDirectory = $toolsDir
@@ -201,7 +290,7 @@ try {
 Write-Host "${creamyGreen}[OK] Desktop shortcut configured (will prompt for UAC on launch, as expected).${reset}"
 
 # -------------------------------------------------------------
-# STEP 3: FORMAL WELCOME & DIRECT ELEVATED LAUNCH
+# STEP 4: FORMAL WELCOME & DIRECT ELEVATED LAUNCH
 # -------------------------------------------------------------
 Write-Host ''
 Write-Host '====================================================================='
