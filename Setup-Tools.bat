@@ -254,75 +254,119 @@ if (-not $activeNames) { $activeNames = ($detectedAVs | Select-Object -ExpandPro
 
 $isThirdParty = ($activeNames -match 'Avast|AVG|Kaspersky|Bitdefender|Norton|Symantec|McAfee|ESET|Malwarebytes|Sophos')
 
-if ($isThirdParty) {
-    Write-Host "${creamyYellow}[!] Note: Third-party antivirus software detected ($activeNames).${reset}"
-    Write-Host "${dimText}    Third-party security suites cannot be opened or configured automatically via script.${reset}"
-    Write-Host "${dimText}    Please open your antivirus control panel / system tray icon and add the folder exception manually:${reset}"
+function Show-ManualAVInstructions {
     Write-Host ''
+    if ($activeNames -match 'Avast|AVG') {
+        Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Avast / AVG:${reset}"
+        Write-Host "${dimText}  1. Open Avast / AVG -> Click 'Menu (≡)' (top right) -> 'Settings'${reset}"
+        Write-Host "${dimText}  2. Go to 'General' tab -> select 'Exceptions'${reset}"
+        Write-Host "${dimText}  3. Click 'Add Exception' and enter or browse to: ${reset}${creamyCyan}$installDir${reset}"
+    } elseif ($activeNames -match 'Kaspersky') {
+        Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Kaspersky:${reset}"
+        Write-Host "${dimText}  1. Open Kaspersky -> Click the 'Settings (gear)' icon in the bottom left${reset}"
+        Write-Host "${dimText}  2. Go to 'Security settings' -> 'Threats and Exclusions' -> 'Manage exclusions'${reset}"
+        Write-Host "${dimText}  3. Click 'Add' -> Browse and select folder: ${reset}${creamyCyan}$installDir${reset}"
+    } elseif ($activeNames -match 'Bitdefender') {
+        Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Bitdefender:${reset}"
+        Write-Host "${dimText}  1. Open Bitdefender -> Click 'Protection' (left panel) -> 'Antivirus'${reset}"
+        Write-Host "${dimText}  2. Go to 'Settings' / 'Exclusions' tab -> Click 'Manage exclusions'${reset}"
+        Write-Host "${dimText}  3. Click 'Add an exclusion' -> Select folder: ${reset}${creamyCyan}$installDir${reset}"
+    } elseif ($activeNames -match 'Norton|Symantec') {
+        Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Norton 360 / Symantec:${reset}"
+        Write-Host "${dimText}  1. Open Norton -> Click 'Settings' -> 'Antivirus'${reset}"
+        Write-Host "${dimText}  2. Select 'Scans and Risks' -> scroll down to 'Exclusions / Low Risks'${reset}"
+        Write-Host "${dimText}  3. Next to 'Items to Exclude from Scans', click 'Configure [+]' -> 'Add Folders'${reset}"
+        Write-Host "${dimText}  4. Browse to and select: ${reset}${creamyCyan}$installDir${reset}"
+    } elseif ($activeNames -match 'McAfee') {
+        Write-Host "${creamyCyan}Step-by-step Exclusion Guide for McAfee:${reset}"
+        Write-Host "${dimText}  1. Open McAfee -> Go to 'My Protection' (or gear icon) -> 'Real-Time Scanning'${reset}"
+        Write-Host "${dimText}  2. Expand 'Excluded Files' -> Click 'Add file or folder'${reset}"
+        Write-Host "${dimText}  3. Browse and select folder: ${reset}${creamyCyan}$installDir${reset}"
+    } elseif ($activeNames -match 'ESET|NOD32') {
+        Write-Host "${creamyCyan}Step-by-step Exclusion Guide for ESET:${reset}"
+        Write-Host "${dimText}  1. Open ESET -> Press 'F5' to open Advanced Setup${reset}"
+        Write-Host "${dimText}  2. Go to 'Detection Engine' -> 'Exclusions' -> 'Detection exclusions'${reset}"
+        Write-Host "${dimText}  3. Click 'Edit' -> 'Add' -> Select folder: ${reset}${creamyCyan}$installDir${reset}"
+    } elseif ($activeNames -match 'Malwarebytes') {
+        Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Malwarebytes:${reset}"
+        Write-Host "${dimText}  1. Open Malwarebytes -> Click 'Settings (gear)' -> 'Allow List' tab${reset}"
+        Write-Host "${dimText}  2. Click 'Add' -> 'Allow a file or folder'${reset}"
+        Write-Host "${dimText}  3. Browse and select folder: ${reset}${creamyCyan}$installDir${reset}"
+    } elseif ($detectedAVs.Count -gt 0 -and $activeNames -notmatch 'Windows Defender') {
+        Write-Host "${creamyCyan}General Exclusion Guide for your Antivirus:${reset}"
+        Write-Host "${dimText}  1. Open your Antivirus control panel from the system tray or Start menu${reset}"
+        Write-Host "${dimText}  2. Navigate to Settings -> 'Exclusions', 'Exceptions' or 'Allow List'${reset}"
+        Write-Host "${dimText}  3. Add the following folder path to the whitelist: ${reset}${creamyCyan}$installDir${reset}"
+    } else {
+        Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Windows Defender:${reset}"
+        Write-Host "${dimText}  1. Open Windows Security -> Virus & threat protection${reset}"
+        Write-Host "${dimText}  2. Click 'Manage settings' under Virus & threat protection settings${reset}"
+        Write-Host "${dimText}  3. Under 'Exclusions', click 'Add or remove exclusions' -> 'Add an exclusion'${reset}"
+        Write-Host "${dimText}  4. Select 'Folder' and choose: ${reset}${creamyCyan}$installDir${reset}"
+    }
+    Write-Host ''
+    if (-not $isThirdParty) {
+        try {
+            Start-Process 'windowsdefender://threatsettings' -ErrorAction SilentlyContinue
+            Write-Host "${creamyGreen}[*] Opened Windows Security settings page.${reset}"
+            Write-Host ''
+        } catch {}
+    }
 }
 
-if ($activeNames -match 'Avast|AVG') {
-    Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Avast / AVG:${reset}"
-    Write-Host "${dimText}  1. Open Avast / AVG -> Click 'Menu (≡)' (top right) -> 'Settings'${reset}"
-    Write-Host "${dimText}  2. Go to 'General' tab -> select 'Exceptions'${reset}"
-    Write-Host "${dimText}  3. Click 'Add Exception' and enter or browse to: ${reset}${creamyCyan}$installDir${reset}"
-} elseif ($activeNames -match 'Kaspersky') {
-    Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Kaspersky:${reset}"
-    Write-Host "${dimText}  1. Open Kaspersky -> Click the 'Settings (gear)' icon in the bottom left${reset}"
-    Write-Host "${dimText}  2. Go to 'Security settings' -> 'Threats and Exclusions' -> 'Manage exclusions'${reset}"
-    Write-Host "${dimText}  3. Click 'Add' -> Browse and select folder: ${reset}${creamyCyan}$installDir${reset}"
-} elseif ($activeNames -match 'Bitdefender') {
-    Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Bitdefender:${reset}"
-    Write-Host "${dimText}  1. Open Bitdefender -> Click 'Protection' (left panel) -> 'Antivirus'${reset}"
-    Write-Host "${dimText}  2. Go to 'Settings' / 'Exclusions' tab -> Click 'Manage exclusions'${reset}"
-    Write-Host "${dimText}  3. Click 'Add an exclusion' -> Select folder: ${reset}${creamyCyan}$installDir${reset}"
-} elseif ($activeNames -match 'Norton|Symantec') {
-    Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Norton 360 / Symantec:${reset}"
-    Write-Host "${dimText}  1. Open Norton -> Click 'Settings' -> 'Antivirus'${reset}"
-    Write-Host "${dimText}  2. Select 'Scans and Risks' -> scroll down to 'Exclusions / Low Risks'${reset}"
-    Write-Host "${dimText}  3. Next to 'Items to Exclude from Scans', click 'Configure [+]' -> 'Add Folders'${reset}"
-    Write-Host "${dimText}  4. Browse to and select: ${reset}${creamyCyan}$installDir${reset}"
-} elseif ($activeNames -match 'McAfee') {
-    Write-Host "${creamyCyan}Step-by-step Exclusion Guide for McAfee:${reset}"
-    Write-Host "${dimText}  1. Open McAfee -> Go to 'My Protection' (or gear icon) -> 'Real-Time Scanning'${reset}"
-    Write-Host "${dimText}  2. Expand 'Excluded Files' -> Click 'Add file or folder'${reset}"
-    Write-Host "${dimText}  3. Browse and select folder: ${reset}${creamyCyan}$installDir${reset}"
-} elseif ($activeNames -match 'ESET|NOD32') {
-    Write-Host "${creamyCyan}Step-by-step Exclusion Guide for ESET:${reset}"
-    Write-Host "${dimText}  1. Open ESET -> Press 'F5' to open Advanced Setup${reset}"
-    Write-Host "${dimText}  2. Go to 'Detection Engine' -> 'Exclusions' -> 'Detection exclusions'${reset}"
-    Write-Host "${dimText}  3. Click 'Edit' -> 'Add' -> Select folder: ${reset}${creamyCyan}$installDir${reset}"
-} elseif ($activeNames -match 'Malwarebytes') {
-    Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Malwarebytes:${reset}"
-    Write-Host "${dimText}  1. Open Malwarebytes -> Click 'Settings (gear)' -> 'Allow List' tab${reset}"
-    Write-Host "${dimText}  2. Click 'Add' -> 'Allow a file or folder'${reset}"
-    Write-Host "${dimText}  3. Browse and select folder: ${reset}${creamyCyan}$installDir${reset}"
-} elseif ($detectedAVs.Count -gt 0 -and $activeNames -notmatch 'Windows Defender') {
-    Write-Host "${creamyCyan}General Exclusion Guide for your Antivirus:${reset}"
-    Write-Host "${dimText}  1. Open your Antivirus control panel from the system tray or Start menu${reset}"
-    Write-Host "${dimText}  2. Navigate to Settings -> 'Exclusions', 'Exceptions' or 'Allow List'${reset}"
-    Write-Host "${dimText}  3. Add the following folder path to the whitelist: ${reset}${creamyCyan}$installDir${reset}"
+# Check if folder is already excluded in Defender
+$alreadyExcluded = $false
+try {
+    $currentPrefs = Get-MpPreference -ErrorAction SilentlyContinue
+    if ($currentPrefs -and ($currentPrefs.ExclusionPath -contains $installDir)) {
+        $alreadyExcluded = $true
+    }
+} catch {}
+
+if ($alreadyExcluded) {
+    Write-Host "${creamyGreen}[OK] Folder '$installDir' is already excluded in Windows Defender.${reset}"
+    Write-Host ''
 } else {
-    Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Windows Defender:${reset}"
-    Write-Host "${dimText}  1. Open Windows Security -> Virus & threat protection${reset}"
-    Write-Host "${dimText}  2. Click 'Manage settings' under Virus & threat protection settings${reset}"
-    Write-Host "${dimText}  3. Under 'Exclusions', click 'Add or remove exclusions' -> 'Add an exclusion'${reset}"
-    Write-Host "${dimText}  4. Select 'Folder' and choose: ${reset}${creamyCyan}$installDir${reset}"
-}
-Write-Host ''
+    Write-Host "${creamyYellow}How would you like to configure antivirus exclusions?${reset}"
+    Write-Host ''
+    Write-Host "  ${creamyGreen}[1] Automatic Exclusion (Recommended)${reset}"
+    Write-Host "${dimText}      Automatically adds '$installDir' to Windows Defender exclusions now.${reset}"
+    Write-Host "  ${creamyCyan}[2] Manual Configuration${reset}"
+    Write-Host "${dimText}      Opens Windows Security settings and displays step-by-step instructions.${reset}"
+    Write-Host "  ${dimText}[3] Skip / Continue without adding exclusion${reset}"
+    Write-Host ''
+    $exChoice = Read-Host "Select an option (1-3, default: 1)"
+    if (-not $exChoice) { $exChoice = '1' }
 
-# Optionally open Windows Security settings window directly for convenience if Defender is active
-if (-not $isThirdParty) {
-    try {
-        Start-Process 'windowsdefender://threatsettings' -ErrorAction SilentlyContinue
-        Write-Host "${creamyGreen}[*] Opened Windows Security settings page.${reset}"
+    if ($exChoice -in @('1', 'Y', 'y', 'S', 's', 'auto', 'automatic')) {
         Write-Host ''
-    } catch {}
+        Write-Host "${creamyCyan}[*] Adding '$installDir' to Windows Defender exclusions...${reset}"
+        try {
+            Add-MpPreference -ExclusionPath $installDir -ErrorAction Stop
+            Write-Host "${creamyGreen}[OK] Successfully added '$installDir' to Windows Defender exclusions!${reset}"
+            if ($isThirdParty) {
+                Write-Host ''
+                Write-Host "${creamyYellow}[!] Note: Third-party antivirus also detected ($activeNames).${reset}"
+                Write-Host "${dimText}    Third-party suites cannot be whitelisted via script. Here are the manual steps if needed:${reset}"
+                Show-ManualAVInstructions
+            }
+        } catch {
+            Write-Host "${creamyYellow}[!] Automatic exclusion could not be applied directly ($($_.Exception.Message)).${reset}"
+            Write-Host "${dimText}    Opening manual security settings...${reset}"
+            Show-ManualAVInstructions
+        }
+    } elseif ($exChoice -in @('2', 'M', 'm', 'manual')) {
+        Show-ManualAVInstructions
+    } else {
+        Write-Host ''
+        Write-Host "${dimText}[INFO] Exclusion configuration skipped by user.${reset}"
+    }
 }
 
+Write-Host ''
 Write-Host '============================================================================================='
 Write-Host ''
-Write-Host 'Press Enter to proceed with download and installation once exclusions are ready...'
+Write-Host 'Press Enter to proceed with download and installation...'
 [void][Console]::ReadLine()
 
 # -------------------------------------------------------------
