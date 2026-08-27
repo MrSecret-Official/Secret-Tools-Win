@@ -207,9 +207,9 @@ function Get-StatusBadge([string]$status) {
 
 function Get-DiskBar([int]$pct, [string]$status) {
     $col = switch ($status) {
-        'Critical' { '#e87878' }
-        'Warning'  { '#f5dc82' }
-        default    { '#91e1a5' }
+        'Critical' { '#8c4b45' }
+        'Warning'  { '#8a6a2e' }
+        default    { '#3f5d4e' }
     }
     return "<div class='disk-bar-bg'><div class='disk-bar-fill' style='width:${pct}%;background:${col}'></div></div><span class='disk-pct'>${pct}%</span>"
 }
@@ -277,9 +277,9 @@ $srtSection = if ($srtContent) {
 $allScores = @($diskScore, $ramScore, $cpuScore, $secScore)
 $overallHealth = if ($allScores -contains 'Critical') { 'Critical' } elseif ($allScores -contains 'Warning') { 'Warning' } else { 'Healthy' }
 $overallColor = switch ($overallHealth) {
-    'Critical' { '#e87878' }
-    'Warning'  { '#f5dc82' }
-    default    { '#91e1a5' }
+    'Critical' { '#8c4b45' }
+    'Warning'  { '#8a6a2e' }
+    default    { '#3f5d4e' }
 }
 
 # ──────────────────────────────────────────────
@@ -293,35 +293,37 @@ $html = @"
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Secret-Tools System Health Report - $hostname</title>
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
     :root {
-        --bg-primary: #0d1117;
-        --bg-secondary: #161b22;
-        --bg-card: #1c2128;
-        --bg-card-hover: #21262d;
-        --border: #30363d;
-        --border-light: #21262d;
-        --text-primary: #e6edf3;
-        --text-secondary: #8b949e;
-        --text-muted: #6e7681;
-        --accent-blue: #4493f8;
-        --accent-green: #3fb950;
-        --accent-yellow: #d29922;
-        --accent-red: #f85149;
-        --accent-purple: #bc8cff;
-        --ok-bg: rgba(63, 185, 80, 0.12);
-        --ok-text: #3fb950;
-        --warn-bg: rgba(210, 153, 34, 0.15);
-        --warn-text: #d29922;
-        --crit-bg: rgba(248, 81, 73, 0.15);
-        --crit-text: #f85149;
+        --bg-primary: #f2ede1;
+        --bg-secondary: #ece5d5;
+        --bg-card: #faf7ef;
+        --bg-card-hover: #f5f0e4;
+        --border: #d8cdb2;
+        --border-light: #e2d9c2;
+        --text-primary: #1b2b40;
+        --text-secondary: #4b5b6e;
+        --text-muted: #7c8794;
+        --navy: #1b2b40;
+        --navy-soft: #2c4362;
+        --accent-blue: #2c4362;
+        --accent-green: #3f5d4e;
+        --accent-yellow: #8a6a2e;
+        --accent-red: #8c4b45;
+        --accent-purple: #2c4362;
+        --ok-bg: rgba(63, 93, 78, 0.10);
+        --ok-text: #3f5d4e;
+        --warn-bg: rgba(138, 106, 46, 0.10);
+        --warn-text: #8a6a2e;
+        --crit-bg: rgba(140, 75, 69, 0.10);
+        --crit-text: #8c4b45;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
         background-color: var(--bg-primary);
         color: var(--text-primary);
         font-size: 14px;
@@ -330,33 +332,9 @@ $html = @"
     }
 
     .report-header {
-        background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1c2128 100%);
-        border-bottom: 1px solid var(--border);
-        padding: 48px 60px 40px;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .report-header::before {
-        content: '';
-        position: absolute;
-        top: -80px;
-        right: -80px;
-        width: 300px;
-        height: 300px;
-        background: radial-gradient(circle, rgba(68, 147, 248, 0.08) 0%, transparent 70%);
-        border-radius: 50%;
-    }
-
-    .report-header::after {
-        content: '';
-        position: absolute;
-        bottom: -60px;
-        left: 200px;
-        width: 200px;
-        height: 200px;
-        background: radial-gradient(circle, rgba(63, 185, 80, 0.06) 0%, transparent 70%);
-        border-radius: 50%;
+        background: var(--navy);
+        border-bottom: 2px solid #8a6a2e;
+        padding: 44px 60px 36px;
     }
 
     .header-top {
@@ -372,17 +350,18 @@ $html = @"
     }
 
     .report-title {
-        font-size: 28px;
-        font-weight: 700;
-        color: var(--text-primary);
-        letter-spacing: -0.5px;
+        font-family: 'Source Serif 4', Georgia, serif;
+        font-size: 26px;
+        font-weight: 600;
+        color: #f2ede1;
+        letter-spacing: 0.2px;
         margin-bottom: 6px;
     }
 
     .report-subtitle {
-        font-size: 14px;
-        color: var(--text-secondary);
-        margin-bottom: 16px;
+        font-size: 13px;
+        color: #c3cede;
+        margin-bottom: 18px;
     }
 
     .header-right {
@@ -394,24 +373,27 @@ $html = @"
     }
 
     .brand-name {
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--accent-blue);
-        letter-spacing: 0.5px;
+        font-family: 'Source Serif 4', Georgia, serif;
+        font-size: 18px;
+        font-weight: 600;
+        color: #f2ede1;
+        letter-spacing: 0.3px;
         line-height: 1.2;
     }
 
     .brand-sub {
-        font-size: 12px;
-        color: var(--text-secondary);
+        font-size: 11px;
+        color: #9aa8bc;
         font-weight: 500;
-        margin-top: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-top: 3px;
         margin-bottom: 12px;
     }
 
     .report-date {
         font-size: 12px;
-        color: var(--text-primary);
+        color: #e2ddce;
         font-family: 'JetBrains Mono', monospace;
         margin-bottom: 4px;
         text-transform: capitalize;
@@ -419,31 +401,30 @@ $html = @"
 
     .report-host {
         font-size: 12px;
-        color: var(--text-muted);
+        color: #9aa8bc;
         font-family: 'JetBrains Mono', monospace;
     }
 
     .overall-health {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 8px 16px;
+        gap: 9px;
+        background: #f2ede1;
+        border: 1px solid #8a6a2e;
+        border-radius: 999px;
+        padding: 7px 16px;
         width: fit-content;
     }
 
     .health-dot {
-        width: 10px;
-        height: 10px;
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
         background: $overallColor;
-        box-shadow: 0 0 8px ${overallColor}88;
     }
 
-    .health-text { font-size: 13px; color: var(--text-secondary); }
-    .health-value { font-size: 13px; font-weight: 600; color: $overallColor; }
+    .health-text { font-size: 12px; color: #4b5b6e; }
+    .health-value { font-size: 12px; font-weight: 600; color: #1b2b40; }
 
     .container { max-width: 1200px; margin: 0 auto; padding: 40px 60px; }
 
@@ -457,14 +438,12 @@ $html = @"
     .summary-card {
         background: var(--bg-card);
         border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 20px;
-        transition: border-color 0.2s;
+        border-radius: 4px;
+        padding: 18px 20px;
     }
 
-    .summary-card:hover { border-color: var(--accent-blue); }
-    .summary-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px; font-weight: 500; }
-    .summary-card-value { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+    .summary-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 8px; font-weight: 500; }
+    .summary-card-value { font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
     .summary-card-sub { font-size: 11px; color: var(--text-secondary); }
     .summary-card-status { font-size: 11px; font-weight: 600; margin-top: 6px; }
 
@@ -475,31 +454,33 @@ $html = @"
         align-items: center;
         gap: 10px;
         margin-bottom: 16px;
-        padding-bottom: 12px;
-        border-bottom: 1px solid var(--border-light);
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border);
     }
 
     .section-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
+        width: 30px;
+        height: 30px;
+        border-radius: 4px;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        background: rgba(27, 43, 64, 0.07);
+        color: var(--navy);
     }
 
     .section-icon svg {
-        width: 17px;
-        height: 17px;
+        width: 15px;
+        height: 15px;
         stroke: currentColor;
         fill: none;
-        stroke-width: 2;
+        stroke-width: 1.75;
         stroke-linecap: round;
         stroke-linejoin: round;
     }
 
-    .section-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+    .section-title { font-family: 'Source Serif 4', Georgia, serif; font-size: 16px; font-weight: 600; color: var(--text-primary); }
     .section-desc { font-size: 12px; color: var(--text-muted); }
 
     table { width: 100%; border-collapse: collapse; }
@@ -507,7 +488,7 @@ $html = @"
     .table-wrap {
         background: var(--bg-card);
         border: 1px solid var(--border);
-        border-radius: 12px;
+        border-radius: 4px;
         overflow: hidden;
     }
 
@@ -519,13 +500,13 @@ $html = @"
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: var(--text-muted);
+        letter-spacing: 0.6px;
+        color: var(--text-secondary);
         border-bottom: 1px solid var(--border);
     }
 
     td {
-        padding: 12px 16px;
+        padding: 11px 16px;
         font-size: 13px;
         color: var(--text-primary);
         border-bottom: 1px solid var(--border-light);
@@ -538,7 +519,7 @@ $html = @"
     .badge {
         display: inline-block;
         padding: 2px 10px;
-        border-radius: 20px;
+        border-radius: 3px;
         font-size: 11px;
         font-weight: 600;
         letter-spacing: 0.3px;
@@ -552,21 +533,21 @@ $html = @"
         font-family: 'JetBrains Mono', monospace;
         font-size: 12px;
         font-weight: 600;
-        color: var(--accent-blue);
+        color: var(--navy);
     }
 
     .disk-bar-bg {
         display: inline-block;
         width: 110px;
-        height: 6px;
+        height: 5px;
         background: var(--bg-secondary);
-        border-radius: 4px;
+        border-radius: 3px;
         overflow: hidden;
         vertical-align: middle;
         margin-right: 8px;
     }
 
-    .disk-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .disk-bar-fill { height: 100%; border-radius: 3px; }
     .disk-pct { font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; vertical-align: middle; }
 
     .info-grid {
@@ -578,8 +559,8 @@ $html = @"
     .info-card {
         background: var(--bg-card);
         border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 20px 24px;
+        border-radius: 4px;
+        padding: 18px 22px;
     }
 
     .info-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border-light); }
@@ -591,23 +572,23 @@ $html = @"
 
     .ram-bar-bg {
         width: 100%;
-        height: 8px;
+        height: 6px;
         background: var(--bg-secondary);
-        border-radius: 6px;
+        border-radius: 3px;
         overflow: hidden;
         margin-bottom: 6px;
     }
 
     .ram-bar-fill {
         height: 100%;
-        border-radius: 6px;
-        background: linear-gradient(90deg, var(--accent-blue), #6cb4f8);
+        border-radius: 3px;
+        background: var(--navy);
     }
 
     .log-block {
         background: var(--bg-secondary);
         border: 1px solid var(--border);
-        border-radius: 10px;
+        border-radius: 4px;
         padding: 16px 20px;
         font-family: 'JetBrains Mono', monospace;
         font-size: 12px;
@@ -622,27 +603,23 @@ $html = @"
     .no-data { font-size: 12px; color: var(--text-muted); font-style: italic; text-align: center; }
     .no-data-p { font-size: 12px; color: var(--text-muted); font-style: italic; padding: 16px 0; }
 
-    .section-icon-os    { background: rgba(68,147,248,0.12); color: var(--accent-blue); }
-    .section-icon-cpu   { background: rgba(188,140,255,0.12); color: var(--accent-purple); }
-    .section-icon-ram   { background: rgba(63,185,80,0.12);  color: var(--accent-green); }
-    .section-icon-disk  { background: rgba(210,153,34,0.12); color: var(--accent-yellow); }
-    .section-icon-gpu   { background: rgba(248,81,73,0.12);  color: var(--accent-red); }
-    .section-icon-net   { background: rgba(68,147,248,0.12); color: var(--accent-blue); }
-    .section-icon-svc   { background: rgba(63,185,80,0.12);  color: var(--accent-green); }
-    .section-icon-sec   { background: rgba(210,153,34,0.12); color: var(--accent-yellow); }
-    .section-icon-log   { background: rgba(160,175,195,0.12); color: #a0afbf; }
-
     .footer {
-        margin-top: 60px;
-        padding: 24px 60px;
+        margin-top: 50px;
+        padding: 0 60px 30px;
+    }
+
+    .footer-inner {
+        max-width: 1200px;
+        margin: 0 auto;
         border-top: 1px solid var(--border);
+        padding-top: 20px;
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
 
     .footer-brand { font-size: 12px; color: var(--text-muted); }
-    .footer-brand span { color: var(--accent-blue); font-weight: 600; }
+    .footer-brand span { color: var(--navy); font-weight: 600; }
     .footer-date { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
 
     @media print {
@@ -680,25 +657,25 @@ $html = @"
             <div class="summary-card-label">Processor</div>
             <div class="summary-card-value" style="font-size:14px;line-height:1.4">$cpuName</div>
             <div class="summary-card-sub">$cpuCores &bull; $cpuSpeed</div>
-            <div class="summary-card-status" style="color:$(switch($cpuScore){'Healthy'{'#3fb950'}'Warning'{'#d29922'}default{'#f85149'}})">$cpuScore</div>
+            <div class="summary-card-status" style="color:$(switch($cpuScore){'Healthy'{'#3f5d4e'}'Warning'{'#8a6a2e'}default{'#8c4b45'}})">$cpuScore</div>
         </div>
         <div class="summary-card">
             <div class="summary-card-label">Memory (RAM)</div>
             <div class="summary-card-value">${usedRam} GB <span style="font-size:14px;font-weight:400;color:var(--text-muted)">/ ${totalRam} GB</span></div>
             <div class="summary-card-sub">$ramPercent% in use</div>
-            <div class="summary-card-status" style="color:$(switch($ramScore){'Healthy'{'#3fb950'}'Warning'{'#d29922'}default{'#f85149'}})">$ramScore</div>
+            <div class="summary-card-status" style="color:$(switch($ramScore){'Healthy'{'#3f5d4e'}'Warning'{'#8a6a2e'}default{'#8c4b45'}})">$ramScore</div>
         </div>
         <div class="summary-card">
             <div class="summary-card-label">Storage</div>
             <div class="summary-card-value">$($disks.Count) <span style="font-size:14px;font-weight:400;color:var(--text-muted)">Volume(s)</span></div>
             <div class="summary-card-sub">$($diskPhysical.Count) Physical Drive(s) detected</div>
-            <div class="summary-card-status" style="color:$(switch($diskScore){'Healthy'{'#3fb950'}'Warning'{'#d29922'}default{'#f85149'}})">$diskScore</div>
+            <div class="summary-card-status" style="color:$(switch($diskScore){'Healthy'{'#3f5d4e'}'Warning'{'#8a6a2e'}default{'#8c4b45'}})">$diskScore</div>
         </div>
         <div class="summary-card">
             <div class="summary-card-label">Security</div>
             <div class="summary-card-value" style="font-size:16px">Windows Defender</div>
             <div class="summary-card-sub">Defs: $defenderDefs</div>
-            <div class="summary-card-status" style="color:$(if($defenderStatus -eq 'Active'){'#3fb950'}else{'#f85149'})">$defenderStatus</div>
+            <div class="summary-card-status" style="color:$(if($defenderStatus -eq 'Active'){'#3f5d4e'}else{'#8c4b45'})">$defenderStatus</div>
         </div>
     </div>
 
@@ -913,8 +890,10 @@ $html = @"
 </div>
 
 <footer class="footer">
-    <div class="footer-brand">Generated by <span>Secret-Tools</span> &bull; mrsecret_official &bull; All data collected locally</div>
-    <div class="footer-date">$reportDate</div>
+    <div class="footer-inner">
+        <div class="footer-brand">Generated by <span>Secret-Tools</span> &bull; mrsecret_official &bull; All data collected locally</div>
+        <div class="footer-date">$reportDate</div>
+    </div>
 </footer>
 
 </body>

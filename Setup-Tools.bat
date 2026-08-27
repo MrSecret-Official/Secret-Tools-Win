@@ -374,6 +374,11 @@ Write-Host 'Press Enter to proceed with download and installation...'
 # The repository is public, so no GitHub token or account is needed to
 # install or update — just a plain, unauthenticated API call.
 # -------------------------------------------------------------
+Clear-Host
+Show-Banner
+Write-Host '============================================================================================='
+Write-Host '                              DOWNLOAD & INSTALLATION'
+Write-Host '============================================================================================='
 Write-Host ''
 
 Write-Host "${creamyCyan}Checking repository update status...${reset}"

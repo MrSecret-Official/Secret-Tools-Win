@@ -161,6 +161,12 @@ $accentBlue   = "$esc[38;2;100;180;255m"
 $dimText      = "$esc[38;2;160;175;195m"
 $reset        = "$esc[0m"
 
+# Cream tones used for the main menu list
+$creamHeader  = "$esc[38;2;236;219;180m"
+$creamItem    = "$esc[38;2;222;201;160m"
+$creamKey     = "$esc[38;2;238;205;140m"
+$creamDim     = "$esc[38;2;190;170;135m"
+
 # Environment & Target Windows Drive Detection (Online vs WinRE Offline)
 $isWinRE = ($env:SECRET_TOOLS_WINRE -eq '1') -or ($env:SystemDrive -eq 'X:')
 $targetWinDrive = if ($env:SECRET_TOOLS_WINDRIVE) { $env:SECRET_TOOLS_WINDRIVE } else { $env:SystemDrive }
@@ -1000,30 +1006,30 @@ while ($true) {
     Write-Host '                    INTELLIGENT SYSTEM RECOVERY & REPAIR ASSISTANT'
     Write-Host '============================================================================================='
     Write-Host ''
-    Write-Host "  ${creamyYellow}--- DIAGNOSTICS & SYSTEM HEALTH ---${reset}"
-    Write-Host "  ${creamyGreen}[ 1] Guided Intelligent System Diagnosis (Scan + Recommended Fix)${reset}"
-    Write-Host "  ${creamyCyan}[ 2] Generate System Health Report (Comprehensive HTML)${reset}"
-    Write-Host "  ${accentBlue}[ 3] Repair History & Error Logs Viewer (SrtTrail / Event Log)${reset}"
+    Write-Host "  ${creamHeader}--- DIAGNOSTICS & SYSTEM HEALTH ---${reset}"
+    Write-Host "  ${creamKey}[1]${reset} ${creamItem}Guided Intelligent System Diagnosis (Scan + Recommended Fix)${reset}"
+    Write-Host "  ${creamKey}[2]${reset} ${creamItem}Generate System Health Report (Comprehensive HTML)${reset}"
+    Write-Host "  ${creamKey}[3]${reset} ${creamItem}Repair History & Error Logs Viewer (SrtTrail / Event Log)${reset}"
     Write-Host ''
-    Write-Host "  ${creamyYellow}--- SYSTEM & BOOT REPAIR ---${reset}"
-    Write-Host "  ${accentBlue}[ 4] Startup & Boot Loop Repair (Fix loops, BCD, SrtTrail, bootrec)${reset}"
-    Write-Host "  ${accentBlue}[ 5] Deep System Files & Image Repair (SFC Offline/Online + DISM)${reset}"
-    Write-Host "  ${accentBlue}[ 6] Disk Integrity & Bad Sector Repair (CHKDSK $targetWinDrive /F /R)${reset}"
-    Write-Host "  ${accentBlue}[ 7] Network, DNS & Firewall Full Repair (Winsock / TCP-IP / Sockets)${reset}"
-    Write-Host "  ${accentBlue}[ 8] Windows Update Clean & Reset (SoftwareDistribution / Catroot2)${reset}"
+    Write-Host "  ${creamHeader}--- SYSTEM & BOOT REPAIR ---${reset}"
+    Write-Host "  ${creamKey}[4]${reset} ${creamItem}Startup & Boot Loop Repair (Fix loops, BCD, SrtTrail, bootrec)${reset}"
+    Write-Host "  ${creamKey}[5]${reset} ${creamItem}Deep System Files & Image Repair (SFC Offline/Online + DISM)${reset}"
+    Write-Host "  ${creamKey}[6]${reset} ${creamItem}Disk Integrity & Bad Sector Repair (CHKDSK $targetWinDrive /F /R)${reset}"
+    Write-Host "  ${creamKey}[7]${reset} ${creamItem}Network, DNS & Firewall Full Repair (Winsock / TCP-IP / Sockets)${reset}"
+    Write-Host "  ${creamKey}[8]${reset} ${creamItem}Windows Update Clean & Reset (SoftwareDistribution / Catroot2)${reset}"
     Write-Host ''
-    Write-Host "  ${creamyYellow}--- BACKUP, ACCESS & SECURITY ---${reset}"
-    Write-Host "  ${accentBlue}[ 9] System Restore Points (List / Create / Roll Back)${reset}"
-    Write-Host "  ${accentBlue}[10] Driver Backup & Restore (Export / Import 3rd Party Drivers)${reset}"
-    Write-Host "  ${accentBlue}[11] BitLocker Recovery Key (Retrieve Volume Protectors)${reset}"
-    Write-Host "  ${accentBlue}[12] Emergency Access Accounts (Enable Administrator / Recovery User)${reset}"
+    Write-Host "  ${creamHeader}--- BACKUP, ACCESS & SECURITY ---${reset}"
+    Write-Host "  ${creamKey}[9]${reset} ${creamItem}System Restore Points (List / Create / Roll Back)${reset}"
+    Write-Host "  ${creamKey}[D]${reset} ${creamItem}Driver Backup & Restore (Export / Import 3rd Party Drivers)${reset}"
+    Write-Host "  ${creamKey}[K]${reset} ${creamItem}BitLocker Recovery Key (Retrieve Volume Protectors)${reset}"
+    Write-Host "  ${creamKey}[E]${reset} ${creamItem}Emergency Access Accounts (Enable Administrator / Recovery User)${reset}"
     Write-Host ''
-    Write-Host "  ${creamyYellow}--- SYSTEM CONTROL ---${reset}"
-    Write-Host "  ${creamyRed}[ 0] Exit${reset}"
+    Write-Host "  ${creamHeader}--- SYSTEM CONTROL ---${reset}"
+    Write-Host "  ${creamyRed}[0]${reset} ${creamDim}Exit${reset}"
     Write-Host ''
     Write-Host '============================================================================================='
     Write-Host ''
-    $choice = Read-Host "Select an option (0-12)"
+    $choice = Read-Host "Select an option (0-9, D, K, E)"
 
     switch ($choice.Trim()) {
         { $_ -in '1','01' } { Assistant-SmartDiagnosis }
@@ -1035,13 +1041,11 @@ while ($true) {
         { $_ -in '7','07' } { Assistant-NetworkRepair }
         { $_ -in '8','08' } { Assistant-WindowsUpdateRepair }
         { $_ -in '9','09' } { Assistant-RestorePoints }
-        '10' { Assistant-DriverBackup }
-        '11' { Assistant-BitLockerKey }
-        '12' { Assistant-EmergencyAccount }
+        { $_ -in 'D','d' } { Assistant-DriverBackup }
+        { $_ -in 'K','k' } { Assistant-BitLockerKey }
+        { $_ -in 'E','e' } { Assistant-EmergencyAccount }
         { $_ -in 'H','h' } { Assistant-HealthReport }
         { $_ -in 'R','r' } { Assistant-RestorePoints }
-        { $_ -in 'K','k' } { Assistant-BitLockerKey }
-        { $_ -in 'D','d' } { Assistant-DriverBackup }
         { $_ -in '0','00','exit','q' } { exit 0 }
         default {
             Write-Host "${creamyRed}Invalid option.${reset}"
