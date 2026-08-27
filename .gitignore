@@ -1,5 +1,6 @@
 
-# Cache files (contains passwords)
+# Cache files (legacy — no longer used since the login system was removed;
+# kept ignored in case of leftovers on already-installed machines)
 cache/
 *.cache
 

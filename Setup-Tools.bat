@@ -55,68 +55,48 @@ function Show-Banner {
     Write-Host ''
 }
 
-function Get-DownloaderToken {
-    return @(
-        'github_pat_11A7BJFXI0q7PNg4npXa5t_',
-        'AaKfbL5Yp6NOJvlu6B6f6qGRN9qoIsFOBTFeuQylxJ1G7FHSOLEo477BXMk'
-    ) -join ''
-}
+# -------------------------------------------------------------
+# SECURE CREDENTIAL STORAGE
+# The GitHub token is never written into source. It is requested once
+# interactively (input hidden) and stored DPAPI-encrypted under the
+# current Windows user profile — only this Windows account on this
+# machine can decrypt it.
+# -------------------------------------------------------------
+$credDir = "$env:LOCALAPPDATA\Secret-Tools\Credentials"
 
-function Get-AuthToken {
-    return @(
-        'github_pat_11A7BJFXI0aWiLGzKPpoFO_',
-        '2zU1UxvcnbxwZXuLJAXxmC7x8cznkLWEX5lcjinftjyNPS27AYRKvFH89wq'
-    ) -join ''
-}
-
-function Fetch-RemotePassword([string]$url, [string]$cachePath) {
+function Get-StoredToken {
+    param([string]$Name)
+    $p = "$credDir\$Name.dat"
+    if (-not (Test-Path $p)) { return $null }
     try {
-        $authTok = Get-AuthToken
-        $h = @{
-            'Authorization' = ('Bearer ' + $authTok)
-            'Accept'        = 'application/vnd.github.v3.raw'
-            'User-Agent'    = 'SecretTools-Client'
-        }
-        $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue
-        if ($res) {
-            $val = ($res.ToString()).Trim()
-            $cd = Split-Path $cachePath -Parent
-            if (-not (Test-Path $cd)) { New-Item -ItemType Directory -Path $cd -Force | Out-Null }
-            $val | Out-File -FilePath $cachePath -Force -Encoding UTF8
-            return $val
-        }
-    } catch {}
-    if (Test-Path $cachePath) {
-        return (Get-Content $cachePath -Raw -ErrorAction SilentlyContinue).Trim()
-    }
-    return $null
+        $secure = Get-Content $p -Raw -ErrorAction Stop | ConvertTo-SecureString
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+        $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        return $plain
+    } catch { return $null }
 }
 
-function Read-MaskedPassword {
-    $pass = ""
-    while ($true) {
-        $key = [Console]::ReadKey($true)
-        if ($key.Key -eq [ConsoleKey]::Enter) {
-            break
-        } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
-            if ($pass.Length -gt 0) {
-                $pass = $pass.Substring(0, $pass.Length - 1)
-                Write-Host -NoNewline "`b `b"
-            }
-        } else {
-            $char = $key.KeyChar
-            if ([int]$char -ge 32) {
-                $pass += $char
-                Write-Host -NoNewline "*"
-            }
-        }
+function Set-StoredToken {
+    param([string]$Name, [string]$PromptText)
+    if (-not (Test-Path $credDir)) { New-Item -ItemType Directory -Path $credDir -Force | Out-Null }
+    $secure = Read-Host -Prompt $PromptText -AsSecureString
+    $secure | ConvertFrom-SecureString | Out-File -FilePath "$credDir\$Name.dat" -Force
+}
+
+function Get-OrRequestToken {
+    param([string]$Name, [string]$PromptText)
+    $tok = Get-StoredToken -Name $Name
+    if (-not $tok) {
+        Write-Host "${creamyYellow}[SETUP] No stored GitHub token found for '$Name'.${reset}"
+        Set-StoredToken -Name $Name -PromptText $PromptText
+        $tok = Get-StoredToken -Name $Name
     }
-    Write-Host ""
-    return $pass
+    return $tok
 }
 
 # -------------------------------------------------------------
-# STEP 1: INITIALIZE & CHECK REPOSITORY VERSION
+# STEP 1: INITIALIZE, AUTHENTICATE & CHECK REPOSITORY VERSION
 # -------------------------------------------------------------
 Clear-Host
 Show-Banner
@@ -125,9 +105,9 @@ Write-Host '                              AUTOMATED INSTALLATION WIZARD'
 Write-Host '============================================================================================='
 Write-Host ''
 
-$token = Get-DownloaderToken
+$repoToken = Get-OrRequestToken -Name 'repo' -PromptText 'GitHub PAT with read access to MrSecret-Official/Secret-Tools-Win (hidden)'
 $headers = @{
-    'Authorization' = ('Bearer ' + $token)
+    'Authorization' = ('Bearer ' + $repoToken)
     'Accept'        = 'application/vnd.github.v3+json'
     'User-Agent'    = 'SecretTools-Installer'
 }
@@ -146,7 +126,6 @@ if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -
 if (-not (Test-Path $packagesDir)) { New-Item -ItemType Directory -Path $packagesDir -Force | Out-Null }
 if (-not (Test-Path "$toolsDir\Access")) { New-Item -ItemType Directory -Path "$toolsDir\Access" -Force | Out-Null }
 if (-not (Test-Path "$toolsDir\logs")) { New-Item -ItemType Directory -Path "$toolsDir\logs" -Force | Out-Null }
-if (-not (Test-Path "$toolsDir\cache")) { New-Item -ItemType Directory -Path "$toolsDir\cache" -Force | Out-Null }
 
 Write-Host "${creamyCyan}Checking repository update status...${reset}"
 $remoteSha = $null
@@ -154,6 +133,11 @@ try {
     $commitInfo = Invoke-RestMethod -Uri "$repoApi/commits/main" -Headers $headers -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue
     $remoteSha = $commitInfo.sha
 } catch {}
+
+if (-not $remoteSha) {
+    Write-Host "${creamyRed}[WARN] Could not reach GitHub or the stored token was rejected.${reset}"
+    Write-Host "${creamyYellow}       If your token expired, delete '$credDir\repo.dat' and re-run this installer.${reset}"
+}
 
 $localSha = ''
 if (Test-Path $versionFile) { $localSha = (Get-Content $versionFile -Raw -ErrorAction SilentlyContinue).Trim() }
@@ -170,73 +154,7 @@ if ($needsDownload -and $remoteSha) {
 }
 
 # -------------------------------------------------------------
-# STEP 2: CREDENTIAL VALIDATION (REQUIRED BEFORE INSTALLING)
-# -------------------------------------------------------------
-$cacheDir = "$toolsDir\cache"
-$u1 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/Sec-User-Pass.txt'
-$u2 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/MrSecret-Access.txt'
-$c1 = "$cacheDir\secret_user.cache"
-$c2 = "$cacheDir\mrsecret.cache"
-
-$passSecretUser = Fetch-RemotePassword -url $u1 -cachePath $c1
-$passMrSecret = Fetch-RemotePassword -url $u2 -cachePath $c2
-
-Write-Host ''
-Write-Host 'Username: Secret-user'
-Write-Host ''
-
-$maxAttempts = 3
-$attempts = 0
-$lastError = ''
-$authenticatedUser = $null
-
-while ($attempts -lt $maxAttempts) {
-    $passLine = [Console]::CursorTop
-    Write-Host -NoNewline 'Password: '
-    if ($lastError) {
-        Write-Host ''
-        Write-Host "${creamyRed}${lastError}${reset}"
-        try {
-            [Console]::SetCursorPosition(10, $passLine)
-        } catch {}
-    }
-    
-    $inputPass = Read-MaskedPassword
-    $cleanInput = if ($inputPass) { $inputPass.Trim() } else { '' }
-    
-    if ($passSecretUser -and ($cleanInput -eq $passSecretUser)) {
-        $authenticatedUser = 'Secret-user'
-        break
-    } elseif ($passMrSecret -and ($cleanInput -eq $passMrSecret)) {
-        $authenticatedUser = 'MrSecret_Official'
-        break
-    } else {
-        $attempts++
-        $remaining = $maxAttempts - $attempts
-        if ($remaining -gt 0) {
-            $lastError = "[ERROR] Incorrect password. Attempts remaining: $remaining"
-        } else {
-            Write-Host ''
-            Write-Host "${creamyRed}[ERROR] Access blocked due to multiple failed attempts.${reset}"
-            Start-Sleep -Seconds 3
-            exit 1
-        }
-    }
-}
-
-if (-not $authenticatedUser) {
-    exit 1
-}
-
-# Save session cache
-$sessionFile = "$cacheDir\session.cache"
-$authenticatedUser | Out-File -FilePath $sessionFile -Force -Encoding UTF8
-$rootCache = "$installDir\cache"
-if (-not (Test-Path $rootCache)) { New-Item -ItemType Directory -Path $rootCache -Force | Out-Null }
-$authenticatedUser | Out-File -FilePath "$rootCache\session.cache" -Force -Encoding UTF8
-
-# -------------------------------------------------------------
-# STEP 3: PERFORM DOWNLOAD / UPDATE & DEPLOYMENT
+# STEP 2: PERFORM DOWNLOAD / UPDATE & DEPLOYMENT
 # -------------------------------------------------------------
 Write-Host ''
 if ($needsDownload) {
@@ -281,8 +199,9 @@ if ($needsDownload) {
     Write-Host "${creamyGreen}[OK] Components already deployed and verified.${reset}"
 }
 
-# Root launcher forwarder with automated elevated launch
-$rootForwarderContent = "@echo off`nsetlocal`nset `"SD=%~dp0`"`nnet session >nul 2>&1`nif %errorlevel% equ 0 (`n    if exist `"%SD%Tools\secret-tools.bat`" (`n        call `"%SD%Tools\secret-tools.bat`" %*`n    ) else (`n        powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n    )`n    exit /b %errorlevel%`n)`nschtasks /query /tn `"SecretTools_Elevated`" >nul 2>&1`nif %errorlevel% equ 0 (`n    schtasks /run /tn `"SecretTools_Elevated`" >nul 2>&1`n    exit /b 0`n)`nif exist `"%SD%Tools\secret-tools.bat`" (`n    call `"%SD%Tools\secret-tools.bat`" %*`n) else (`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`n)`nexit /b %errorlevel%"
+# Root launcher forwarder. No scheduled-task trick, no forced elevation
+# outside of the normal Windows UAC prompt shown by secret-tools.bat itself.
+$rootForwarderContent = "@echo off`r`nsetlocal`r`nset `"SD=%~dp0`"`r`nif exist `"%SD%Tools\secret-tools.bat`" (`r`n    call `"%SD%Tools\secret-tools.bat`" %*`r`n) else (`r`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%SD%Tools\Access\Password_manager.ps1`" %*`r`n)`r`nexit /b %errorlevel%"
 Set-Content -Path $rootLauncher -Value $rootForwarderContent -Force
 
 # Register in User PATH
@@ -299,7 +218,9 @@ if ($pathUpdated) {
     Write-Host "${creamyGreen}[OK] Added to User PATH (command: secret-tools).${reset}"
 }
 
-# Desktop shortcut with mandatory Run As Administrator Flag
+# Desktop shortcut. The "Run as Administrator" compatibility flag on the
+# shortcut only makes Windows show its normal UAC consent prompt as soon
+# as you double-click it — it does not skip or suppress that prompt.
 $ws = New-Object -ComObject WScript.Shell
 $desktop = [Environment]::GetFolderPath('Desktop')
 $shortcutPath = "$desktop\Secret-Tools.lnk"
@@ -309,41 +230,26 @@ $shortcut.WorkingDirectory = $toolsDir
 $shortcut.Description = 'Secret-Tools Management and Repair Panel'
 $shortcut.Save()
 
-# Set Run as Administrator byte in shortcut file
 try {
     $lnkBytes = [System.IO.File]::ReadAllBytes($shortcutPath)
     $lnkBytes[0x15] = $lnkBytes[0x15] -bor 0x20
     [System.IO.File]::WriteAllBytes($shortcutPath, $lnkBytes)
 } catch {}
 
-# Register Windows AppCompatFlags to ensure Secret-Tools always runs as Admin
-try {
-    $regKey = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
-    if (-not (Test-Path $regKey)) { New-Item -Path $regKey -Force | Out-Null }
-    Set-ItemProperty -Path $regKey -Name $mainBat -Value "~ RUNASADMIN" -Force -ErrorAction SilentlyContinue
-    Set-ItemProperty -Path $regKey -Name $rootLauncher -Value "~ RUNASADMIN" -Force -ErrorAction SilentlyContinue
-} catch {}
-
-# Register Elevated Scheduled Task (Runs with HIGHEST privileges without UAC prompts)
-try {
-    cmd /c "schtasks /create /tn `"SecretTools_Elevated`" /tr `"$mainBat`" /rl HIGHEST /sc ONCE /st 00:00 /f" >nul 2>&1
-} catch {}
-
-Write-Host "${creamyGreen}[OK] Desktop shortcut & Administrator execution policies configured.${reset}"
+Write-Host "${creamyGreen}[OK] Desktop shortcut configured (will prompt for UAC on launch, as expected).${reset}"
 
 # -------------------------------------------------------------
-# STEP 4: FORMAL WELCOME & DIRECT ELEVATED LAUNCH
+# STEP 3: FORMAL WELCOME & DIRECT ELEVATED LAUNCH
 # -------------------------------------------------------------
 Write-Host ''
 Write-Host '====================================================================='
-Write-Host " Welcome, $authenticatedUser."
+Write-Host " Welcome, $env:USERNAME."
 Write-Host ' Status: All components installed and verified successfully.'
-Write-Host ' Launching Secret-Tools directly with Administrator privileges...'
+Write-Host ' Launching Secret-Tools (it will request Administrator elevation once)...'
 Write-Host '====================================================================='
 Write-Host ''
 Start-Sleep -Milliseconds 800
 
-# Direct execution handover to Secret-Tools within the same elevated token
 if (Test-Path $mainBat) {
     cmd /c "`"$mainBat`""
 } elseif (Test-Path "$toolsDir\Access\Password_manager.ps1") {

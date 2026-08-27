@@ -1,5 +1,6 @@
-# password_manager.ps1
+# Password_manager.ps1
 # Secret-Tools : Windows Recovery & Repair Suite (WinRE & Online Compatible)
+# Fallback console used when secret-tools.bat has not been deployed yet.
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -16,7 +17,8 @@ $reset        = "$esc[0m"
 $isWinRE = ($env:SECRET_TOOLS_WINRE -eq '1') -or ($env:SystemDrive -eq 'X:')
 $targetWinDrive = if ($env:SECRET_TOOLS_WINDRIVE) { $env:SECRET_TOOLS_WINDRIVE } else { $env:SystemDrive }
 
-# Auto-elevate to Administrator in normal Windows if not already elevated
+# Auto-elevate to Administrator in normal Windows if not already elevated.
+# This shows the standard Windows UAC consent prompt exactly once per launch.
 if (-not $isWinRE) {
     $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $currentPrincipal = New-Object Security.Principal.WindowsPrincipal($currentIdentity)
@@ -48,14 +50,6 @@ if ($PSScriptRoot) {
 } elseif ($MyInvocation.MyCommand -and $MyInvocation.MyCommand.Path) {
     $scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 }
-
-$candidateCaches = @(
-    "$scriptDir\cache",
-    "$installDir\cache",
-    "$toolsDir\cache",
-    "$targetWinDrive\Tools\cache",
-    "$targetWinDrive\Users\*\Tools\cache"
-)
 
 # Auto-register in User PATH if running in standard Windows
 if (-not $isWinRE) {
@@ -97,69 +91,28 @@ function Show-Banner {
     Write-Host ''
 }
 
-function Get-DownloaderToken {
-    return @(
-        'github_pat_11A7BJFXI0q7PNg4npXa5t_',
-        'AaKfbL5Yp6NOJvlu6B6f6qGRN9qoIsFOBTFeuQylxJ1G7FHSOLEo477BXMk'
-    ) -join ''
+# -------------------------------------------------------------
+# GitHub token: read-only lookup of the DPAPI-encrypted token that
+# Setup-Tools.bat stores under %LOCALAPPDATA%. Only used for the optional
+# "is there an update?" check. If it's missing, the check is silently
+# skipped — never prompts here, never stored in source.
+# -------------------------------------------------------------
+$credDir = "$env:LOCALAPPDATA\Secret-Tools\Credentials"
+
+function Get-StoredToken {
+    param([string]$Name)
+    $p = "$credDir\$Name.dat"
+    if (-not (Test-Path $p)) { return $null }
+    try {
+        $secure = Get-Content $p -Raw -ErrorAction Stop | ConvertTo-SecureString
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+        $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        return $plain
+    } catch { return $null }
 }
 
-function Get-AuthToken {
-    return @(
-        'github_pat_11A7BJFXI0aWiLGzKPpoFO_',
-        '2zU1UxvcnbxwZXuLJAXxmC7x8cznkLWEX5lcjinftjyNPS27AYRKvFH89wq'
-    ) -join ''
-}
-
-function Fetch-Password([string]$url, [string]$cachePath) {
-    if (-not $isWinRE) {
-        try {
-            $t = Get-AuthToken
-            $h = @{
-                'Authorization' = ('Bearer ' + $t)
-                'Accept'        = 'application/vnd.github.v3.raw'
-                'User-Agent'    = 'SecretTools-Client'
-            }
-            $res = Invoke-RestMethod -Uri $url -Headers $h -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue
-            if ($res) {
-                $val = ($res.ToString()).Trim()
-                $cd = Split-Path $cachePath -Parent
-                if (-not (Test-Path $cd)) { New-Item -ItemType Directory -Path $cd -Force | Out-Null }
-                $val | Out-File -FilePath $cachePath -Force -Encoding UTF8
-                return $val
-            }
-        } catch {}
-    }
-    if (Test-Path $cachePath) {
-        return (Get-Content $cachePath -Raw -ErrorAction SilentlyContinue).Trim()
-    }
-    return $null
-}
-
-function Read-MaskedPassword {
-    $pass = ""
-    while ($true) {
-        $key = [Console]::ReadKey($true)
-        if ($key.Key -eq [ConsoleKey]::Enter) {
-            break
-        } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
-            if ($pass.Length -gt 0) {
-                $pass = $pass.Substring(0, $pass.Length - 1)
-                Write-Host -NoNewline "`b `b"
-            }
-        } else {
-            $char = $key.KeyChar
-            if ([int]$char -ge 32) {
-                $pass += $char
-                Write-Host -NoNewline "*"
-            }
-        }
-    }
-    Write-Host ""
-    return $pass
-}
-
-# Check for updates in background (online mode only)
+# Check for updates in background (online mode only, best-effort)
 $updateNotice = $null
 if (-not $isWinRE) {
     $versionFile = "$installDir\.version"
@@ -169,11 +122,11 @@ if (-not $isWinRE) {
         $localSha = (Get-Content $versionFile -Raw -ErrorAction SilentlyContinue).Trim()
     }
 
-    if ($localSha) {
+    $repoToken = Get-StoredToken -Name 'repo'
+    if ($localSha -and $repoToken) {
         try {
-            $t = Get-DownloaderToken
             $h = @{
-                'Authorization' = ('Bearer ' + $t)
+                'Authorization' = ('Bearer ' + $repoToken)
                 'Accept'        = 'application/vnd.github.v3+json'
                 'User-Agent'    = 'SecretTools-Client'
             }
@@ -187,96 +140,10 @@ if (-not $isWinRE) {
     }
 }
 
-# 1. Resolve authentication
-$cachedUser = $null
-foreach ($c in $candidateCaches) {
-    $sf = "$c\session.cache"
-    if (Test-Path $sf) {
-        $u = (Get-Content $sf -Raw -ErrorAction SilentlyContinue).Trim()
-        if ($u -eq 'Secret-user' -or $u -eq 'MrSecret_Official') {
-            $cachedUser = $u
-            break
-        }
-    }
-}
-
-$currentUser = $cachedUser
-
-if (-not $currentUser) {
-    $primaryCache = "$scriptDir\cache"
-    if (-not (Test-Path $primaryCache)) { New-Item -ItemType Directory -Path $primaryCache -Force | Out-Null }
-
-    $u1 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/Sec-User-Pass.txt'
-    $u2 = 'https://api.github.com/repos/MrSecret-Official/Secret-Credentials/contents/Secret-Tools-Win/Passwords/MrSecret-Access.txt'
-    $c1 = "$primaryCache\secret_user.cache"
-    $c2 = "$primaryCache\mrsecret.cache"
-
-    $passSecretUser = Fetch-Password -url $u1 -cachePath $c1
-    $passMrSecret = Fetch-Password -url $u2 -cachePath $c2
-
-    # WinRE fallback defaults if cache not present
-    if (-not $passSecretUser) { $passSecretUser = "SecretUserPass" }
-
-    $maxAttempts = 3
-    $attempts = 0
-    $lastError = ''
-
-    while ($attempts -lt $maxAttempts) {
-        Clear-Host
-        Show-Banner
-        if ($updateNotice) {
-            Write-Host "${creamyYellow}$updateNotice${reset}"
-            Write-Host ''
-        }
-        Write-Host 'Username: Secret-user'
-        Write-Host ''
-        
-        $passLine = [Console]::CursorTop
-        Write-Host -NoNewline 'Password: '
-        if ($lastError) {
-            Write-Host ''
-            Write-Host "${creamyRed}${lastError}${reset}"
-            try {
-                [Console]::SetCursorPosition(10, $passLine)
-            } catch {}
-        }
-        
-        $inputPass = Read-MaskedPassword
-        $cleanInput = if ($inputPass) { $inputPass.Trim() } else { '' }
-        
-        if ($passSecretUser -and ($cleanInput -eq $passSecretUser)) {
-            $currentUser = 'Secret-user'
-            break
-        } elseif ($passMrSecret -and ($cleanInput -eq $passMrSecret)) {
-            $currentUser = 'MrSecret_Official'
-            break
-        } else {
-            $attempts++
-            $remaining = $maxAttempts - $attempts
-            if ($remaining -gt 0) {
-                $lastError = "[ERROR] Incorrect password. Attempts remaining: $remaining"
-            } else {
-                Clear-Host
-                Show-Banner
-                Write-Host 'Username: Secret-user'
-                Write-Host ''
-                Write-Host 'Password: '
-                Write-Host "${creamyRed}[ERROR] Access blocked due to multiple failed attempts.${reset}"
-                Start-Sleep -Seconds 3
-                exit 1
-            }
-        }
-    }
-
-    if ($currentUser) {
-        foreach ($c in $candidateCaches) {
-            try {
-                if (-not (Test-Path $c)) { New-Item -ItemType Directory -Path $c -Force | Out-Null }
-                $currentUser | Out-File -FilePath "$c\session.cache" -Force -Encoding UTF8 -ErrorAction SilentlyContinue
-            } catch {}
-        }
-    }
-}
+# No login gate: this tool runs under your own already-authenticated Windows
+# session. The one thing worth protecting (running system-changing actions)
+# is already gated by the UAC elevation above.
+$currentUser = $env:USERNAME
 
 # ===================================================================
 # ASSISTANT SECURITY & RECOVERY MODULES (WINRE & ONLINE AWARE)
@@ -345,9 +212,9 @@ function Request-AdminElevation {
 # 1. GUIDED INTELLIGENT SYSTEM DIAGNOSIS
 function Assistant-SmartDiagnosis {
     Invoke-AssistantHeader "INTELLIGENT ASSISTANT: COMPREHENSIVE SYSTEM DIAGNOSIS" "The assistant will scan critical Windows components and propose tailored repairs."
-    
+
     $issues = @()
-    
+
     # 1. Startup & SrtTrail log inspection
     Write-Host "${accentBlue}[1/6] Scanning boot integrity and SrtTrail.txt logs...${reset}" -NoNewline
     $srtPath = "$targetWinDrive\Windows\System32\Logfiles\Srt\SrtTrail.txt"
@@ -432,7 +299,7 @@ function Assistant-SmartDiagnosis {
     Write-Host '---------------------------------------------------------------------------------------------'
     Write-Host " DIAGNOSTIC ASSISTANT SUMMARY:"
     Write-Host '---------------------------------------------------------------------------------------------'
-    
+
     if ($issues.Count -eq 0) {
         Write-Host "${creamyGreen} [EXCELLENT] No critical system anomalies detected.${reset}"
         Write-Host "${dimText} System components and boot configuration are operational.${reset}"
@@ -496,13 +363,13 @@ function Apply-SmartFixes([array]$issues) {
 
 # 2. STARTUP & SRTTRAIL REPAIR
 function Assistant-BootRepair {
-    Invoke-AssistantHeader "ASSISTANT: STARTUP & SRTTRAIL.TXT REPAIR" "Resolves Automatic Repair boot loops and rebuilds the BCD boot store."
-    
+    Invoke-AssistantHeader "ASSISTANT: STARTUP & SRTTRAIL.TXT REPAIR" "Resolves Automatic Repair boot loops, rebuilds the BCD boot store and repairs the boot sector."
+
     if (-not (Request-AdminElevation)) { return }
 
     Create-SafeRestorePoint
 
-    Write-Host "${creamyCyan}[1/4] Inspecting SrtTrail.txt failure log...${reset}"
+    Write-Host "${creamyCyan}[1/5] Inspecting SrtTrail.txt failure log...${reset}"
     $srtPath = "$targetWinDrive\Windows\System32\Logfiles\Srt\SrtTrail.txt"
     if (-not (Test-Path $srtPath) -and (Test-Path "X:\Windows\System32\Logfiles\Srt\SrtTrail.txt")) {
         $srtPath = "X:\Windows\System32\Logfiles\Srt\SrtTrail.txt"
@@ -515,18 +382,26 @@ function Assistant-BootRepair {
     }
     Write-Host ''
 
-    Write-Host "${creamyCyan}[2/4] Disabling Windows 'Automatic Repair' infinite loop...${reset}"
+    Write-Host "${creamyCyan}[2/5] Disabling Windows 'Automatic Repair' infinite loop...${reset}"
     bcdedit /set '{default}' recoveryenabled No 2>$null
     bcdedit /set '{default}' bootstatuspolicy ignoreallfailures 2>$null
     Write-Host "${creamyGreen}[OK] Boot policy updated. Direct OS boot enabled.${reset}"
     Write-Host ''
 
-    Write-Host "${creamyCyan}[3/4] Rebuilding UEFI / MBR boot files (bcdboot)...${reset}"
+    Write-Host "${creamyCyan}[3/5] Rebuilding UEFI / MBR boot files (bcdboot)...${reset}"
     cmd /c "bcdboot $targetWinDrive\Windows /l en-us /s $targetWinDrive /f ALL" 2>$null
     Write-Host "${creamyGreen}[OK] System boot files refreshed successfully.${reset}"
     Write-Host ''
 
-    Write-Host "${creamyCyan}[4/4] Reverting pending failed updates (DISM)...${reset}"
+    Write-Host "${creamyCyan}[4/5] Running advanced boot record repair (bootrec)...${reset}"
+    bootrec /fixmbr 2>$null
+    bootrec /fixboot 2>$null
+    bootrec /scanos 2>$null
+    bootrec /rebuildbcd 2>$null
+    Write-Host "${creamyGreen}[OK] Boot sector, boot manager and BCD entries rebuilt.${reset}"
+    Write-Host ''
+
+    Write-Host "${creamyCyan}[5/5] Reverting pending failed updates (DISM)...${reset}"
     if ($isWinRE) {
         dism /image:$targetWinDrive\ /cleanup-image /revertpendingactions
     } else {
@@ -534,7 +409,7 @@ function Assistant-BootRepair {
     }
     Write-Host "${creamyGreen}[OK] Pending actions verified and cleaned.${reset}"
 
-    Write-AssistantLog "BootRepair" "SUCCESS" "Startup and SrtTrail repair completed"
+    Write-AssistantLog "BootRepair" "SUCCESS" "Startup, SrtTrail and bootrec repair completed"
     Write-Host ''
     Write-Host "${creamyGreen}[ASSISTANT] Startup repair process completed successfully.${reset}"
     Write-Host 'Press Enter to return to main menu...'
@@ -705,17 +580,84 @@ function Assistant-WindowsUpdateRepair {
 }
 
 # 7. EMERGENCY ACCESS ACCOUNTS
+# Requires physical interactive confirmation at the console (this is a local
+# recovery action for the device owner, not something remotely triggerable).
 function Assistant-EmergencyAccount {
     Invoke-AssistantHeader "ASSISTANT: EMERGENCY ACCESS ACCOUNTS" "Enables built-in administration accounts to recover computer access."
 
     if (-not (Request-AdminElevation)) { return }
 
+    if ($isWinRE) {
+        # 'net user' from WinRE only affects WinRE's own temporary RAM-disk
+        # session, not the offline Windows installation being recovered. To
+        # actually reach the target install from here, we use the standard,
+        # widely-documented offline recovery technique: temporarily swap the
+        # Accessibility (Utilman.exe) binary on the TARGET drive for cmd.exe.
+        # After a normal reboot, clicking the accessibility icon on the login
+        # screen launches a SYSTEM-level prompt instead, from which you can
+        # run 'net user' against the real installation. Always undo it
+        # afterward with option [2] below.
+        Write-Host "${creamyYellow}[INFO] WinRE has no live Windows session to add accounts to directly.${reset}"
+        Write-Host "${dimText}This enables a one-time SYSTEM prompt at the login screen of $targetWinDrive instead.${reset}"
+        Write-Host ''
+        Write-Host "  [1] Enable SYSTEM prompt at login screen (swaps Utilman.exe on $targetWinDrive)"
+        Write-Host "  [2] Undo it (restore original Utilman.exe)"
+        Write-Host "  [3] Return to main menu"
+        Write-Host ''
+        $op = Read-Host "Select an option (1-3)"
+
+        $utilman = "$targetWinDrive\Windows\System32\Utilman.exe"
+        $utilmanBackup = "$targetWinDrive\Windows\System32\Utilman.exe.secrettools_bak"
+        $cmdExe = "$targetWinDrive\Windows\System32\cmd.exe"
+
+        if ($op -eq '1') {
+            if (-not (Test-Path $utilman)) {
+                Write-Host "${creamyRed}[ERROR] Utilman.exe not found on $targetWinDrive. Is the drive letter correct?${reset}"
+            } elseif (Test-Path $utilmanBackup) {
+                Write-Host "${creamyYellow}[INFO] Already enabled. Reboot normally and click the accessibility icon at the login screen.${reset}"
+            } else {
+                try {
+                    Copy-Item -Path $utilman -Destination $utilmanBackup -Force
+                    Copy-Item -Path $cmdExe -Destination $utilman -Force
+                    Write-Host "${creamyGreen}[OK] Done. Reboot normally into Windows, then on the login screen click the${reset}"
+                    Write-Host "${creamyGreen}     Accessibility icon (bottom-right) - it opens a SYSTEM Command Prompt.${reset}"
+                    Write-Host "${creamyGreen}     From there run:  net user Administrator /active:yes${reset}"
+                    Write-Host "${creamyGreen}     or:               net user <youraccount> <newpassword>${reset}"
+                    Write-Host "${creamyYellow}[IMPORTANT] Boot back into WinRE and choose [2] here to undo this once you're done -${reset}"
+                    Write-Host "${creamyYellow}            leaving it enabled is a standing bypass of the login screen.${reset}"
+                    Write-AssistantLog "EmergencyAccess" "SUCCESS" "Utilman.exe swapped on $targetWinDrive for offline recovery"
+                } catch {
+                    Write-Host "${creamyRed}[ERROR] $($_.Exception.Message)${reset}"
+                }
+            }
+        } elseif ($op -eq '2') {
+            if (Test-Path $utilmanBackup) {
+                try {
+                    Copy-Item -Path $utilmanBackup -Destination $utilman -Force
+                    Remove-Item $utilmanBackup -Force
+                    Write-Host "${creamyGreen}[OK] Utilman.exe restored to its original state.${reset}"
+                    Write-AssistantLog "EmergencyAccess" "SUCCESS" "Utilman.exe restored on $targetWinDrive"
+                } catch {
+                    Write-Host "${creamyRed}[ERROR] $($_.Exception.Message)${reset}"
+                }
+            } else {
+                Write-Host "${dimText}[INFO] Nothing to undo - no backup found.${reset}"
+            }
+        }
+
+        Write-Host ''
+        Write-Host 'Press Enter to return to main menu...'
+        [void][Console]::ReadLine()
+        return
+    }
+
+    # Online mode: acts directly on the current, already-logged-in Windows session.
     Write-Host "  [1] Enable Windows built-in Administrator account"
     Write-Host "  [2] Create a new Emergency Administrator user"
     Write-Host "  [3] Return to main menu"
     Write-Host ''
     $op = Read-Host "Select an option (1-3)"
-    
+
     if ($op -eq '1') {
         net user Administrator /active:yes 2>$null
         net user Administrador /active:yes 2>$null
@@ -768,6 +710,145 @@ function Assistant-ViewLogs {
     [void][Console]::ReadLine()
 }
 
+# 9. SYSTEM RESTORE POINTS
+function Assistant-RestorePoints {
+    Invoke-AssistantHeader "ASSISTANT: SYSTEM RESTORE POINTS" "List, create or roll back to a previous System Restore Point."
+
+    if ($isWinRE) {
+        # WinRE ships its own offline-aware System Restore wizard; it already
+        # knows how to enumerate and apply restore points against the target
+        # installation correctly, so we hand off to it rather than reimplement it.
+        Write-Host "${creamyCyan}[*] Launching the offline System Restore wizard for $targetWinDrive ...${reset}"
+        $rstrui = "$targetWinDrive\Windows\System32\rstrui.exe"
+        if (Test-Path $rstrui) {
+            Start-Process $rstrui -Wait
+        } else {
+            Write-Host "${creamyRed}[ERROR] rstrui.exe not found on $targetWinDrive.${reset}"
+        }
+        Write-Host ''
+        Write-Host 'Press Enter to return to main menu...'
+        [void][Console]::ReadLine()
+        return
+    }
+
+    if (-not (Request-AdminElevation)) { return }
+
+    $points = Get-ComputerRestorePoint -ErrorAction SilentlyContinue
+    if (-not $points) {
+        Write-Host "${creamyYellow}[INFO] No restore points found, or System Restore is disabled on $env:SystemDrive.${reset}"
+        Write-Host "Enable System Restore and create one now? (Y/N): " -NoNewline
+        $ans = Read-Host
+        if ($ans -match '^[YySs]') {
+            Enable-ComputerRestore -Drive "$env:SystemDrive" -ErrorAction SilentlyContinue
+            Checkpoint-Computer -Description "Secret-Tools Manual Restore Point" -RestorePointType "MODIFY_SETTINGS" -ErrorAction SilentlyContinue
+            Write-Host "${creamyGreen}[OK] Restore point created.${reset}"
+            Write-AssistantLog "RestorePoint" "SUCCESS" "Manual restore point created"
+        }
+    } else {
+        Write-Host "${creamyYellow}Available restore points:${reset}"
+        Write-Host ''
+        $points | Sort-Object SequenceNumber -Descending | ForEach-Object {
+            Write-Host ("  [{0}] {1}  ({2})" -f $_.SequenceNumber, $_.Description, $_.CreationTime)
+        }
+        Write-Host ''
+        Write-Host "  [N] Create a new restore point"
+        Write-Host ''
+        $sel = Read-Host "Enter a restore point number to roll back to, N to create new, or blank to cancel"
+        if ($sel -match '^[Nn]$') {
+            Checkpoint-Computer -Description "Secret-Tools Manual Restore Point" -RestorePointType "MODIFY_SETTINGS" -ErrorAction SilentlyContinue
+            Write-Host "${creamyGreen}[OK] Restore point created.${reset}"
+            Write-AssistantLog "RestorePoint" "SUCCESS" "Manual restore point created"
+        } elseif ($sel -match '^\d+$') {
+            $target = $points | Where-Object { $_.SequenceNumber -eq [int]$sel }
+            if ($target) {
+                Write-Host "${creamyRed}[WARNING] This restarts the computer and rolls back system files/settings to '$($target.Description)'.${reset}"
+                Write-Host "Proceed? (Y/N): " -NoNewline
+                $confirm = Read-Host
+                if ($confirm -match '^[YySs]') {
+                    Write-AssistantLog "RestorePoint" "SUCCESS" "Restoring to point $sel : $($target.Description)"
+                    Restore-Computer -RestorePoint $target.SequenceNumber -Confirm:$false
+                }
+            } else {
+                Write-Host "${creamyRed}[ERROR] Restore point not found.${reset}"
+            }
+        }
+    }
+
+    Write-Host ''
+    Write-Host 'Press Enter to return to main menu...'
+    [void][Console]::ReadLine()
+}
+
+# 10. BITLOCKER RECOVERY KEY
+function Assistant-BitLockerKey {
+    Invoke-AssistantHeader "ASSISTANT: BITLOCKER RECOVERY KEY" "Displays the BitLocker numerical recovery password for a volume (works online and offline via manage-bde)."
+
+    $drive = $targetWinDrive
+    if (-not $isWinRE) {
+        $inputDrive = Read-Host "Drive to check (Enter for default: $targetWinDrive)"
+        if ($inputDrive) { $drive = $inputDrive }
+    }
+
+    Write-Host "${creamyCyan}[*] Reading BitLocker protectors for $drive ...${reset}"
+    Write-Host ''
+    $out = manage-bde -protectors -get $drive 2>&1
+    $out | ForEach-Object { Write-Host $_ }
+
+    Write-AssistantLog "BitLockerKey" "SUCCESS" "Recovery key viewed for $drive"
+    Write-Host ''
+    Write-Host "${creamyYellow}[TIP] Look for 'Numerical Password' above - that's what Windows asks for at boot.${reset}"
+    Write-Host 'Press Enter to return to main menu...'
+    [void][Console]::ReadLine()
+}
+
+# 11. DRIVER BACKUP & RESTORE
+function Assistant-DriverBackup {
+    Invoke-AssistantHeader "ASSISTANT: DRIVER BACKUP & RESTORE" "Exports installed third-party drivers so they can be reinstalled after a clean setup."
+
+    if (-not (Request-AdminElevation)) { return }
+
+    Write-Host "  [1] Export drivers to a folder"
+    Write-Host "  [2] Import drivers from a folder"
+    Write-Host "  [3] Return to main menu"
+    Write-Host ''
+    $op = Read-Host "Select an option (1-3)"
+
+    $defaultDir = if ($isWinRE) { "$targetWinDrive\DriverBackup" } else { "$([Environment]::GetFolderPath('MyDocuments'))\Secret-Tools\DriverBackup" }
+
+    if ($op -eq '1') {
+        $dest = Read-Host "Destination folder (Enter for default: $defaultDir)"
+        if (-not $dest) { $dest = $defaultDir }
+        if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }
+        Write-Host "${creamyCyan}[*] Exporting drivers to $dest ...${reset}"
+        if ($isWinRE) {
+            dism /image:$targetWinDrive\ /export-driver /destination:"$dest"
+        } else {
+            dism /online /export-driver /destination:"$dest"
+        }
+        Write-Host "${creamyGreen}[OK] Drivers exported to $dest.${reset}"
+        Write-AssistantLog "DriverBackup" "SUCCESS" "Drivers exported to $dest"
+    } elseif ($op -eq '2') {
+        $src = Read-Host "Source folder containing exported drivers (Enter for default: $defaultDir)"
+        if (-not $src) { $src = $defaultDir }
+        if (-not (Test-Path $src)) {
+            Write-Host "${creamyRed}[ERROR] Folder not found: $src${reset}"
+        } else {
+            Write-Host "${creamyCyan}[*] Importing drivers from $src ...${reset}"
+            if ($isWinRE) {
+                dism /image:$targetWinDrive\ /add-driver /driver:"$src" /recurse
+            } else {
+                dism /online /add-driver /driver:"$src" /recurse
+            }
+            Write-Host "${creamyGreen}[OK] Drivers imported from $src.${reset}"
+            Write-AssistantLog "DriverBackup" "SUCCESS" "Drivers imported from $src"
+        }
+    }
+
+    Write-Host ''
+    Write-Host 'Press Enter to return to main menu...'
+    [void][Console]::ReadLine()
+}
+
 # ===================================================================
 # MAIN ASSISTANT MENU LOOP
 # ===================================================================
@@ -778,7 +859,7 @@ while ($true) {
         Write-Host "${creamyYellow}$updateNotice${reset}"
         Write-Host ''
     }
-    
+
     $modeTag = if ($isWinRE) { "${creamyYellow}[WINRE OFFLINE MODE: $targetWinDrive]${reset}" } else { "${creamyGreen}[ONLINE MODE]${reset}" }
     $isAdmin = if (Check-IsAdmin) { "${creamyGreen}[ADMIN]${reset}" } else { "${dimText}[USER]${reset}" }
     Write-Host " User: ${creamyCyan}$currentUser${reset} $isAdmin $modeTag | Host: ${creamyCyan}$env:COMPUTERNAME${reset} | Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
@@ -794,12 +875,14 @@ while ($true) {
     Write-Host "  ${accentBlue}[6] Windows Update Clean & Reset (SoftwareDistribution / Catroot2)${reset}"
     Write-Host "  ${accentBlue}[7] Emergency Access Accounts (Enable Administrator / Create Recovery User)${reset}"
     Write-Host "  ${accentBlue}[8] Repair History & Logs Viewer (SrtTrail / Event Log)${reset}"
-    Write-Host "  ${creamyRed}[9] Sign Out / Clear Cached Credentials${reset}"
+    Write-Host "  ${accentBlue}[9] System Restore Points (List / Create / Roll Back)${reset}"
+    Write-Host "  ${accentBlue}[K] BitLocker Recovery Key${reset}"
+    Write-Host "  ${accentBlue}[D] Driver Backup & Restore (Export / Import)${reset}"
     Write-Host "  ${dimText}[0] Exit${reset}"
     Write-Host ''
     Write-Host '============================================================================================='
     Write-Host ''
-    $choice = Read-Host "Select an option (0-9)"
+    $choice = Read-Host "Select an option (0-9, K, D)"
 
     switch ($choice.Trim()) {
         '1' { Assistant-SmartDiagnosis }
@@ -808,19 +891,11 @@ while ($true) {
         '4' { Assistant-DiskRepair }
         '5' { Assistant-NetworkRepair }
         '6' { Assistant-WindowsUpdateRepair }
+        '9' { Assistant-RestorePoints }
+        { $_ -in 'K','k' } { Assistant-BitLockerKey }
+        { $_ -in 'D','d' } { Assistant-DriverBackup }
         '7' { Assistant-EmergencyAccount }
         '8' { Assistant-ViewLogs }
-        '9' {
-            foreach ($c in $candidateCaches) {
-                try {
-                    $sf = "$c\session.cache"
-                    if (Test-Path $sf) { Remove-Item $sf -Force -ErrorAction SilentlyContinue }
-                } catch {}
-            }
-            Write-Host "${creamyYellow}Session signed out successfully.${reset}"
-            Start-Sleep -Seconds 1
-            exit 0
-        }
         '0' { exit 0 }
         default {
             Write-Host "${creamyRed}Invalid option.${reset}"
