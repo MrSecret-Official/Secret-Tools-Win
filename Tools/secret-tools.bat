@@ -161,8 +161,7 @@ $accentBlue   = "$esc[38;2;100;180;255m"
 $dimText      = "$esc[38;2;160;175;195m"
 $reset        = "$esc[0m"
 
-# Cream tones used for the main menu list
-$creamHeader  = "$esc[38;2;236;219;180m"
+# Cream tones used for the main menu list (section headers use $accentBlue for the blue/cream scheme)
 $creamItem    = "$esc[38;2;222;201;160m"
 $creamKey     = "$esc[38;2;238;205;140m"
 $creamDim     = "$esc[38;2;190;170;135m"
@@ -1006,25 +1005,26 @@ while ($true) {
     Write-Host '                    INTELLIGENT SYSTEM RECOVERY & REPAIR ASSISTANT'
     Write-Host '============================================================================================='
     Write-Host ''
-    Write-Host "  ${creamHeader}--- DIAGNOSTICS & SYSTEM HEALTH ---${reset}"
+    Write-Host "  ${accentBlue}--- DIAGNOSTICS & SYSTEM HEALTH ---${reset}"
     Write-Host "  ${creamKey}[1]${reset} ${creamItem}Guided Intelligent System Diagnosis (Scan + Recommended Fix)${reset}"
     Write-Host "  ${creamKey}[2]${reset} ${creamItem}Generate System Health Report (Comprehensive HTML)${reset}"
     Write-Host "  ${creamKey}[3]${reset} ${creamItem}Repair History & Error Logs Viewer (SrtTrail / Event Log)${reset}"
     Write-Host ''
-    Write-Host "  ${creamHeader}--- SYSTEM & BOOT REPAIR ---${reset}"
+    Write-Host "  ${accentBlue}--- SYSTEM & BOOT REPAIR ---${reset}"
     Write-Host "  ${creamKey}[4]${reset} ${creamItem}Startup & Boot Loop Repair (Fix loops, BCD, SrtTrail, bootrec)${reset}"
     Write-Host "  ${creamKey}[5]${reset} ${creamItem}Deep System Files & Image Repair (SFC Offline/Online + DISM)${reset}"
     Write-Host "  ${creamKey}[6]${reset} ${creamItem}Disk Integrity & Bad Sector Repair (CHKDSK $targetWinDrive /F /R)${reset}"
     Write-Host "  ${creamKey}[7]${reset} ${creamItem}Network, DNS & Firewall Full Repair (Winsock / TCP-IP / Sockets)${reset}"
     Write-Host "  ${creamKey}[8]${reset} ${creamItem}Windows Update Clean & Reset (SoftwareDistribution / Catroot2)${reset}"
     Write-Host ''
-    Write-Host "  ${creamHeader}--- BACKUP, ACCESS & SECURITY ---${reset}"
+    Write-Host "  ${accentBlue}--- BACKUP, ACCESS & SECURITY ---${reset}"
     Write-Host "  ${creamKey}[9]${reset} ${creamItem}System Restore Points (List / Create / Roll Back)${reset}"
     Write-Host "  ${creamKey}[D]${reset} ${creamItem}Driver Backup & Restore (Export / Import 3rd Party Drivers)${reset}"
     Write-Host "  ${creamKey}[K]${reset} ${creamItem}BitLocker Recovery Key (Retrieve Volume Protectors)${reset}"
     Write-Host "  ${creamKey}[E]${reset} ${creamItem}Emergency Access Accounts (Enable Administrator / Recovery User)${reset}"
     Write-Host ''
-    Write-Host "  ${creamHeader}--- SYSTEM CONTROL ---${reset}"
+    Write-Host "  ${accentBlue}--- SYSTEM CONTROL ---${reset}"
+    Write-Host "  ${dimText}[H] Quick Access: System Health Report${reset}"
     Write-Host "  ${creamyRed}[0]${reset} ${creamDim}Exit${reset}"
     Write-Host ''
     Write-Host '============================================================================================='
