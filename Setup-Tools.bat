@@ -252,6 +252,15 @@ Write-Host ''
 $activeNames = ($detectedAVs | Where-Object { $_.IsActive } | Select-Object -ExpandProperty Name) -join ' '
 if (-not $activeNames) { $activeNames = ($detectedAVs | Select-Object -ExpandProperty Name) -join ' ' }
 
+$isThirdParty = ($activeNames -match 'Avast|AVG|Kaspersky|Bitdefender|Norton|Symantec|McAfee|ESET|Malwarebytes|Sophos')
+
+if ($isThirdParty) {
+    Write-Host "${creamyYellow}[!] Note: Third-party antivirus software detected ($activeNames).${reset}"
+    Write-Host "${dimText}    Third-party security suites cannot be opened or configured automatically via script.${reset}"
+    Write-Host "${dimText}    Please open your antivirus control panel / system tray icon and add the folder exception manually:${reset}"
+    Write-Host ''
+}
+
 if ($activeNames -match 'Avast|AVG') {
     Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Avast / AVG:${reset}"
     Write-Host "${dimText}  1. Open Avast / AVG -> Click 'Menu (≡)' (top right) -> 'Settings'${reset}"
@@ -288,6 +297,11 @@ if ($activeNames -match 'Avast|AVG') {
     Write-Host "${dimText}  1. Open Malwarebytes -> Click 'Settings (gear)' -> 'Allow List' tab${reset}"
     Write-Host "${dimText}  2. Click 'Add' -> 'Allow a file or folder'${reset}"
     Write-Host "${dimText}  3. Browse and select folder: ${reset}${creamyCyan}$installDir${reset}"
+} elseif ($detectedAVs.Count -gt 0 -and $activeNames -notmatch 'Windows Defender') {
+    Write-Host "${creamyCyan}General Exclusion Guide for your Antivirus:${reset}"
+    Write-Host "${dimText}  1. Open your Antivirus control panel from the system tray or Start menu${reset}"
+    Write-Host "${dimText}  2. Navigate to Settings -> 'Exclusions', 'Exceptions' or 'Allow List'${reset}"
+    Write-Host "${dimText}  3. Add the following folder path to the whitelist: ${reset}${creamyCyan}$installDir${reset}"
 } else {
     Write-Host "${creamyCyan}Step-by-step Exclusion Guide for Windows Defender:${reset}"
     Write-Host "${dimText}  1. Open Windows Security -> Virus & threat protection${reset}"
@@ -297,16 +311,13 @@ if ($activeNames -match 'Avast|AVG') {
 }
 Write-Host ''
 
-# Attempt automatic exclusion for Windows Defender if available
-try {
-    if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
-        Add-MpPreference -ExclusionPath $installDir -ErrorAction Stop
-        Write-Host "${creamyGreen}[OK] Windows Defender exclusion automatically registered for: $installDir${reset}"
+# Optionally open Windows Security settings window directly for convenience if Defender is active
+if (-not $isThirdParty) {
+    try {
+        Start-Process 'windowsdefender://threatsettings' -ErrorAction SilentlyContinue
+        Write-Host "${creamyGreen}[*] Opened Windows Security settings page.${reset}"
         Write-Host ''
-    }
-} catch {
-    Write-Host "${dimText}[i] (Note: If Tamper Protection or third-party AV is active, configure exclusion manually above)${reset}"
-    Write-Host ''
+    } catch {}
 }
 
 Write-Host '============================================================================================='
