@@ -3,7 +3,7 @@
 setlocal EnableDelayedExpansion
 title Setup-Tools - Secret-Tools Installer
 color 0B
-mode con: cols=95 lines=34 >nul 2>&1
+mode con: cols=100 lines=55 >nul 2>&1
 
 :: Auto-elevate to Administrator if not already elevated
 net session >nul 2>&1
