@@ -161,10 +161,10 @@ $accentBlue   = "$esc[38;2;100;180;255m"
 $dimText      = "$esc[38;2;160;175;195m"
 $reset        = "$esc[0m"
 
-# Cream tones used for the main menu list (section headers use $accentBlue for the blue/cream scheme)
-$creamItem    = "$esc[38;2;222;201;160m"
-$creamKey     = "$esc[38;2;238;205;140m"
-$creamDim     = "$esc[38;2;190;170;135m"
+# Creamy soft blue tones used for the main menu list (section headers use $accentBlue for the blue scheme)
+$creamItem    = "$esc[38;2;175;215;245m"
+$creamKey     = "$esc[38;2;135;210;255m"
+$creamDim     = "$esc[38;2;145;180;205m"
 
 # Environment & Target Windows Drive Detection (Online vs WinRE Offline)
 $isWinRE = ($env:SECRET_TOOLS_WINRE -eq '1') -or ($env:SystemDrive -eq 'X:')
@@ -1024,7 +1024,7 @@ while ($true) {
     Write-Host "  ${creamKey}[E]${reset} ${creamItem}Emergency Access Accounts (Enable Administrator / Recovery User)${reset}"
     Write-Host ''
     Write-Host "  ${accentBlue}--- SYSTEM CONTROL ---${reset}"
-    Write-Host "  ${dimText}[H] Quick Access: System Health Report${reset}"
+    Write-Host "  ${creamKey}[H]${reset} ${creamItem}Quick Access: System Health Report${reset}"
     Write-Host "  ${creamyRed}[0]${reset} ${creamDim}Exit${reset}"
     Write-Host ''
     Write-Host '============================================================================================='
