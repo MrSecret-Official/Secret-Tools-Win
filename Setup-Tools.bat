@@ -165,18 +165,63 @@ if ($consent -notmatch '^[YySs]') {
 }
 
 # -------------------------------------------------------------
-# STEP 2: CHECK REPOSITORY VERSION
-# The repository is public, so no GitHub token or account is needed to
-# install or update — just a plain, unauthenticated API call.
+# STEP 2: ANTIVIRUS & DEFENDER EXCLUSION NOTICE
+# Shown immediately after consent. Warns the user that antivirus engines
+# may intercept or block the script download, and prompts to add exclusions.
 # -------------------------------------------------------------
+Clear-Host
+Show-Banner
+Write-Host '============================================================================================='
+Write-Host '                         ANTIVIRUS / SECURITY SOFTWARE NOTICE'
+Write-Host '============================================================================================='
+Write-Host ''
+Write-Host "${creamyYellow}[WARNING] Antivirus software may intercept, pause, or block the download!${reset}"
+Write-Host ''
+Write-Host "${dimText}Because Secret-Tools contains administrative diagnostic, repair, and password management${reset}"
+Write-Host "${dimText}scripts, Windows Defender or third-party antivirus engines (Avast, Norton, McAfee, etc.)${reset}"
+Write-Host "${dimText}may trigger false positives and block the download or delete script files.${reset}"
+Write-Host ''
+Write-Host "${creamyCyan}Recommended Action:${reset}"
+Write-Host "${dimText}  Please add the installation directory to your Antivirus Exclusions before continuing:${reset}"
+Write-Host "  ${creamyGreen}$installDir${reset}"
+Write-Host ''
+Write-Host "${dimText}  How to add an exclusion in Windows Defender:${reset}"
+Write-Host "${dimText}    1. Open Windows Security -> Virus & threat protection${reset}"
+Write-Host "${dimText}    2. Click 'Manage settings' under Virus & threat protection settings${reset}"
+Write-Host "${dimText}    3. Under 'Exclusions', click 'Add or remove exclusions' -> 'Add an exclusion'${reset}"
+Write-Host "${dimText}    4. Select 'Folder' and choose: ${reset}${creamyCyan}$installDir${reset}"
 Write-Host ''
 
-# Ensure required directories
+# Ensure required directories exist before registering exclusion
 if (-not (Test-Path $installDir)) { New-Item -ItemType Directory -Path $installDir -Force | Out-Null }
 if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null }
 if (-not (Test-Path $packagesDir)) { New-Item -ItemType Directory -Path $packagesDir -Force | Out-Null }
 if (-not (Test-Path "$toolsDir\Access")) { New-Item -ItemType Directory -Path "$toolsDir\Access" -Force | Out-Null }
 if (-not (Test-Path "$toolsDir\logs")) { New-Item -ItemType Directory -Path "$toolsDir\logs" -Force | Out-Null }
+
+# Attempt automatic exclusion for Windows Defender
+try {
+    if (Get-Command Add-MpPreference -ErrorAction SilentlyContinue) {
+        Add-MpPreference -ExclusionPath $installDir -ErrorAction Stop
+        Write-Host "${creamyGreen}[OK] Windows Defender exclusion automatically registered for: $installDir${reset}"
+        Write-Host ''
+    }
+} catch {
+    Write-Host "${dimText}[i] (Note: If Tamper Protection or third-party AV is active, configure exclusion manually)${reset}"
+    Write-Host ''
+}
+
+Write-Host '============================================================================================='
+Write-Host ''
+Write-Host 'Press Enter to proceed with download and installation once exclusions are ready...'
+[void][Console]::ReadLine()
+
+# -------------------------------------------------------------
+# STEP 3: CHECK REPOSITORY VERSION
+# The repository is public, so no GitHub token or account is needed to
+# install or update — just a plain, unauthenticated API call.
+# -------------------------------------------------------------
+Write-Host ''
 
 Write-Host "${creamyCyan}Checking repository update status...${reset}"
 $remoteSha = $null
@@ -207,7 +252,7 @@ if ($needsDownload -and $remoteSha) {
 }
 
 # -------------------------------------------------------------
-# STEP 3: PERFORM DOWNLOAD / UPDATE & DEPLOYMENT
+# STEP 4: PERFORM DOWNLOAD / UPDATE & DEPLOYMENT
 # -------------------------------------------------------------
 Write-Host ''
 if ($needsDownload) {
@@ -290,7 +335,7 @@ try {
 Write-Host "${creamyGreen}[OK] Desktop shortcut configured (will prompt for UAC on launch, as expected).${reset}"
 
 # -------------------------------------------------------------
-# STEP 4: FORMAL WELCOME & DIRECT ELEVATED LAUNCH
+# STEP 5: FORMAL WELCOME & DIRECT ELEVATED LAUNCH
 # -------------------------------------------------------------
 Write-Host ''
 Write-Host '====================================================================='
