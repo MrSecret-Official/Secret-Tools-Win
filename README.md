@@ -63,10 +63,18 @@ automatically. No credentials involved at any point.
 - This repo is public and contains no secrets, tokens, or passwords — keep
   it that way. Never commit credentials into any file here.
 - `[7] Emergency Access Accounts` can enable the built-in Administrator
-  account or create a new local admin user. It requires being physically at
-  the console and confirming interactively — **only use it on a device you
-  own or are explicitly authorized to administer.** If you're sharing this
-  tool with friends, make sure they understand that boundary too.
+  account or create a new local admin user, but **only from an already
+  logged-in Windows session** — **only use it on a device you own or are
+  explicitly authorized to administer.** If you're sharing this tool with
+  friends, make sure they understand that boundary too. There is
+  deliberately no offline/WinRE login-screen bypass: if you're fully locked
+  out (no account you can log into at all), use Microsoft's own recovery
+  paths — an online password reset via https://account.live.com/password/reset
+  for Microsoft accounts, or a password reset disk for local accounts. That
+  offline-bypass capability was tried and removed: it's the most
+  fingerprinted "login bypass" technique that exists, so antivirus software
+  flags it regardless of how carefully it's implemented — the capability
+  itself is indistinguishable from what a backdoor does.
 - Anyone can read this source (that's the point), so review any change
   before you run it — especially anything touching elevation, the boot
   process, or account management.

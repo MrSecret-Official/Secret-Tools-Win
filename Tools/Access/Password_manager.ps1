@@ -566,63 +566,28 @@ function Assistant-EmergencyAccount {
     if (-not (Request-AdminElevation)) { return }
 
     if ($isWinRE) {
-        # 'net user' from WinRE only affects WinRE's own temporary RAM-disk
-        # session, not the offline Windows installation being recovered. To
-        # actually reach the target install from here, we use the standard,
-        # widely-documented offline recovery technique: temporarily swap the
-        # Accessibility (Utilman.exe) binary on the TARGET drive for cmd.exe.
-        # After a normal reboot, clicking the accessibility icon on the login
-        # screen launches a SYSTEM-level prompt instead, from which you can
-        # run 'net user' against the real installation. Always undo it
-        # afterward with option [2] below.
-        Write-Host "${creamyYellow}[INFO] WinRE has no live Windows session to add accounts to directly.${reset}"
-        Write-Host "${dimText}This enables a one-time SYSTEM prompt at the login screen of $targetWinDrive instead.${reset}"
+        # Deliberately NOT implemented here: swapping a system binary (e.g.
+        # Utilman.exe/sethc.exe) to get a SYSTEM prompt at the login screen
+        # is the single most fingerprinted "login bypass" technique that
+        # exists, and antivirus engines flag it on sight regardless of how
+        # it's implemented or why. There's no way to do it "safely" from a
+        # code standpoint - the capability itself (turn offline physical
+        # access into admin access with no known credential) is what gets
+        # flagged, since that's indistinguishable from what a backdoor does.
+        # Use one of Microsoft's own supported recovery paths instead:
+        Write-Host "${creamyYellow}[INFO] There's no live Windows session to add accounts to from WinRE.${reset}"
         Write-Host ''
-        Write-Host "  [1] Enable SYSTEM prompt at login screen (swaps Utilman.exe on $targetWinDrive)"
-        Write-Host "  [2] Undo it (restore original Utilman.exe)"
-        Write-Host "  [3] Return to main menu"
+        Write-Host "${dimText}This assistant doesn't offer an offline login-screen bypass - that technique${reset}"
+        Write-Host "${dimText}(replacing a system binary to get a prompt at the login screen) is exactly${reset}"
+        Write-Host "${dimText}what antivirus software flags as a backdoor, no matter how it's implemented.${reset}"
         Write-Host ''
-        $op = Read-Host "Select an option (1-3)"
-
-        $utilman = "$targetWinDrive\Windows\System32\Utilman.exe"
-        $utilmanBackup = "$targetWinDrive\Windows\System32\Utilman.exe.secrettools_bak"
-        $cmdExe = "$targetWinDrive\Windows\System32\cmd.exe"
-
-        if ($op -eq '1') {
-            if (-not (Test-Path $utilman)) {
-                Write-Host "${creamyRed}[ERROR] Utilman.exe not found on $targetWinDrive. Is the drive letter correct?${reset}"
-            } elseif (Test-Path $utilmanBackup) {
-                Write-Host "${creamyYellow}[INFO] Already enabled. Reboot normally and click the accessibility icon at the login screen.${reset}"
-            } else {
-                try {
-                    Copy-Item -Path $utilman -Destination $utilmanBackup -Force
-                    Copy-Item -Path $cmdExe -Destination $utilman -Force
-                    Write-Host "${creamyGreen}[OK] Done. Reboot normally into Windows, then on the login screen click the${reset}"
-                    Write-Host "${creamyGreen}     Accessibility icon (bottom-right) - it opens a SYSTEM Command Prompt.${reset}"
-                    Write-Host "${creamyGreen}     From there run:  net user Administrator /active:yes${reset}"
-                    Write-Host "${creamyGreen}     or:               net user <youraccount> <newpassword>${reset}"
-                    Write-Host "${creamyYellow}[IMPORTANT] Boot back into WinRE and choose [2] here to undo this once you're done -${reset}"
-                    Write-Host "${creamyYellow}            leaving it enabled is a standing bypass of the login screen.${reset}"
-                    Write-AssistantLog "EmergencyAccess" "SUCCESS" "Utilman.exe swapped on $targetWinDrive for offline recovery"
-                } catch {
-                    Write-Host "${creamyRed}[ERROR] $($_.Exception.Message)${reset}"
-                }
-            }
-        } elseif ($op -eq '2') {
-            if (Test-Path $utilmanBackup) {
-                try {
-                    Copy-Item -Path $utilmanBackup -Destination $utilman -Force
-                    Remove-Item $utilmanBackup -Force
-                    Write-Host "${creamyGreen}[OK] Utilman.exe restored to its original state.${reset}"
-                    Write-AssistantLog "EmergencyAccess" "SUCCESS" "Utilman.exe restored on $targetWinDrive"
-                } catch {
-                    Write-Host "${creamyRed}[ERROR] $($_.Exception.Message)${reset}"
-                }
-            } else {
-                Write-Host "${dimText}[INFO] Nothing to undo - no backup found.${reset}"
-            }
-        }
-
+        Write-Host "${creamyCyan}If you're locked out of every account on $targetWinDrive, use one of these instead:${reset}"
+        Write-Host "  - Microsoft account: reset the password online from another device at"
+        Write-Host "    https://account.live.com/password/reset, then sign in normally."
+        Write-Host "  - Local account: use a password reset disk if you created one in advance"
+        Write-Host "    (Control Panel > User Accounts > Create a password reset disk)."
+        Write-Host "  - No reset option available: back up your files from here (WinRE has file"
+        Write-Host "    access to $targetWinDrive) before considering a clean reinstall."
         Write-Host ''
         Write-Host 'Press Enter to return to main menu...'
         [void][Console]::ReadLine()
@@ -630,6 +595,8 @@ function Assistant-EmergencyAccount {
     }
 
     # Online mode: acts directly on the current, already-logged-in Windows session.
+    # This is the safe, legitimate case - you're already authenticated as some
+    # user and are elevating/adding an account from inside that session.
     Write-Host "  [1] Enable Windows built-in Administrator account"
     Write-Host "  [2] Create a new Emergency Administrator user"
     Write-Host "  [3] Return to main menu"
