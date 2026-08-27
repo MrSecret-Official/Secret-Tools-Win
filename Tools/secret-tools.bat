@@ -238,28 +238,8 @@ function Show-Banner {
     Write-Host ''
 }
 
-# -------------------------------------------------------------
-# GitHub token: read-only lookup of the DPAPI-encrypted token that
-# Setup-Tools.bat stores under %LOCALAPPDATA%. Only used for the optional
-# "is there an update?" check. If it's missing, the check is silently
-# skipped — never prompts here, never stored in source.
-# -------------------------------------------------------------
-$credDir = "$env:LOCALAPPDATA\Secret-Tools\Credentials"
-
-function Get-StoredToken {
-    param([string]$Name)
-    $p = "$credDir\$Name.dat"
-    if (-not (Test-Path $p)) { return $null }
-    try {
-        $secure = Get-Content $p -Raw -ErrorAction Stop | ConvertTo-SecureString
-        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-        $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-        return $plain
-    } catch { return $null }
-}
-
-# Check for updates in background (online mode only, best-effort)
+# Check for updates in background (online mode only, best-effort).
+# The repository is public, so no token is needed to check for updates.
 $updateNotice = $null
 if (-not $isWinRE) {
     $versionFile = "$installDir\.version"
@@ -269,13 +249,11 @@ if (-not $isWinRE) {
         $localSha = (Get-Content $versionFile -Raw -ErrorAction SilentlyContinue).Trim()
     }
 
-    $repoToken = Get-StoredToken -Name 'repo'
-    if ($localSha -and $repoToken) {
+    if ($localSha) {
         try {
             $h = @{
-                'Authorization' = ('Bearer ' + $repoToken)
-                'Accept'        = 'application/vnd.github.v3+json'
-                'User-Agent'    = 'SecretTools-Client'
+                'Accept'     = 'application/vnd.github.v3+json'
+                'User-Agent' = 'SecretTools-Client'
             }
             $repoApi = 'https://api.github.com/repos/MrSecret-Official/Secret-Tools-Win'
             $commit = Invoke-RestMethod -Uri "$repoApi/commits/main" -Headers $h -Method Get -TimeoutSec 4 -ErrorAction SilentlyContinue
@@ -888,25 +866,7 @@ function Assistant-HealthReport {
     [void][Console]::ReadLine()
 }
 
-# 10. CLEAR STORED GITHUB TOKEN
-function Assistant-ClearToken {
-    Invoke-AssistantHeader "ASSISTANT: CLEAR STORED GITHUB TOKEN" "Removes the locally stored, DPAPI-encrypted GitHub token used for update checks."
-
-    $tokenPath = "$credDir\repo.dat"
-    if (Test-Path $tokenPath) {
-        Remove-Item $tokenPath -Force -ErrorAction SilentlyContinue
-        Write-Host "${creamyGreen}[OK] Stored token removed. Re-run Setup-Tools.bat to provide a new one.${reset}"
-        Write-AssistantLog "ClearToken" "SUCCESS" "Stored GitHub token removed"
-    } else {
-        Write-Host "${dimText}[INFO] No stored token found.${reset}"
-    }
-
-    Write-Host ''
-    Write-Host 'Press Enter to return to main menu...'
-    [void][Console]::ReadLine()
-}
-
-# 11. SYSTEM RESTORE POINTS
+# 10. SYSTEM RESTORE POINTS
 function Assistant-RestorePoints {
     Invoke-AssistantHeader "ASSISTANT: SYSTEM RESTORE POINTS" "List, create or roll back to a previous System Restore Point."
 
@@ -973,7 +933,7 @@ function Assistant-RestorePoints {
     [void][Console]::ReadLine()
 }
 
-# 12. BITLOCKER RECOVERY KEY
+# 11. BITLOCKER RECOVERY KEY
 function Assistant-BitLockerKey {
     Invoke-AssistantHeader "ASSISTANT: BITLOCKER RECOVERY KEY" "Displays the BitLocker numerical recovery password for a volume (works online and offline via manage-bde)."
 
@@ -995,7 +955,7 @@ function Assistant-BitLockerKey {
     [void][Console]::ReadLine()
 }
 
-# 13. DRIVER BACKUP & RESTORE
+# 12. DRIVER BACKUP & RESTORE
 function Assistant-DriverBackup {
     Invoke-AssistantHeader "ASSISTANT: DRIVER BACKUP & RESTORE" "Exports installed third-party drivers so they can be reinstalled after a clean setup."
 
@@ -1071,12 +1031,11 @@ while ($true) {
     Write-Host "  ${accentBlue}[R] System Restore Points (List / Create / Roll Back)${reset}"
     Write-Host "  ${accentBlue}[K] BitLocker Recovery Key${reset}"
     Write-Host "  ${accentBlue}[D] Driver Backup & Restore (Export / Import)${reset}"
-    Write-Host "  ${dimText}[9] Clear Stored GitHub Token${reset}"
     Write-Host "  ${dimText}[0] Exit${reset}"
     Write-Host ''
     Write-Host '============================================================================================='
     Write-Host ''
-    $choice = Read-Host "Select an option (0-9, H, R, K, D)"
+    $choice = Read-Host "Select an option (0-8, H, R, K, D)"
 
     switch ($choice.Trim()) {
         '1' { Assistant-SmartDiagnosis }
@@ -1091,7 +1050,6 @@ while ($true) {
         { $_ -in 'R','r' } { Assistant-RestorePoints }
         { $_ -in 'K','k' } { Assistant-BitLockerKey }
         { $_ -in 'D','d' } { Assistant-DriverBackup }
-        '9' { Assistant-ClearToken }
         '0' { exit 0 }
         default {
             Write-Host "${creamyRed}Invalid option.${reset}"

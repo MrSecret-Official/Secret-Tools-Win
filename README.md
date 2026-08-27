@@ -10,24 +10,22 @@ This tool is for **PERSONAL USE ONLY** on your own devices.
 
 ## 1. Quick Installation
 
-Execute **`Setup-Tools.bat`**:
+This repository is public, so anyone can install it — no GitHub account or
+token required. Just execute **`Setup-Tools.bat`**:
 
 ```cmd
 Setup-Tools.bat
 ```
 
-The first time you run it, it will ask for a **GitHub Personal Access Token**
-with read access to this repository (input is hidden). The token is never
-stored in any script — it's saved once, encrypted with Windows DPAPI, under
-`%LOCALAPPDATA%\Secret-Tools\Credentials\`, and can only be decrypted by your
-own Windows user account on this machine.
-
 This single script:
-- Fetches all required files from the repository using that token.
+- Fetches all required files from this public repository.
 - Installs the project into `%USERPROFILE%\Tools`.
 - Adds `%USERPROFILE%\Tools` to your system `PATH`.
 - Creates a Desktop shortcut (`Secret-Tools.lnk`).
 - Checks for updates automatically every time it runs.
+
+Share `Setup-Tools.bat` (or the repository link) with friends and they can
+install it the same way, on their own machine.
 
 ---
 
@@ -52,23 +50,23 @@ protection is your Windows account password plus full-disk encryption
 
 ---
 
-## 3. Updating / clearing the stored token
+## 3. Updating
 
-- Re-running `Setup-Tools.bat` checks for and deploys updates automatically.
-- If your GitHub token expires or you want to rotate it, clear it from the
-  running tool via menu option **[9] Clear Stored GitHub Token**, or delete
-  `%LOCALAPPDATA%\Secret-Tools\Credentials\repo.dat` manually. The next run
-  of `Setup-Tools.bat` will ask for a new one.
+Re-running `Setup-Tools.bat` (or just relaunching `secret-tools`, which
+checks in the background) detects and deploys new commits to this repo
+automatically. No credentials involved at any point.
 
 ---
 
 ## Security notes
 
-- Never commit a GitHub token into any file in this repo. If one is ever
-  exposed (pasted somewhere, checked into git, shown to a third party), treat
-  it as compromised and revoke/regenerate it immediately from
-  GitHub → Settings → Developer settings → Personal access tokens.
+- This repo is public and contains no secrets, tokens, or passwords — keep
+  it that way. Never commit credentials into any file here.
 - `[7] Emergency Access Accounts` can enable the built-in Administrator
   account or create a new local admin user. It requires being physically at
-  the console and confirming interactively — use it only when you actually
-  need to recover access to this machine.
+  the console and confirming interactively — **only use it on a device you
+  own or are explicitly authorized to administer.** If you're sharing this
+  tool with friends, make sure they understand that boundary too.
+- Anyone can read this source (that's the point), so review any change
+  before you run it — especially anything touching elevation, the boot
+  process, or account management.

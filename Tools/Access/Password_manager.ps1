@@ -91,28 +91,8 @@ function Show-Banner {
     Write-Host ''
 }
 
-# -------------------------------------------------------------
-# GitHub token: read-only lookup of the DPAPI-encrypted token that
-# Setup-Tools.bat stores under %LOCALAPPDATA%. Only used for the optional
-# "is there an update?" check. If it's missing, the check is silently
-# skipped — never prompts here, never stored in source.
-# -------------------------------------------------------------
-$credDir = "$env:LOCALAPPDATA\Secret-Tools\Credentials"
-
-function Get-StoredToken {
-    param([string]$Name)
-    $p = "$credDir\$Name.dat"
-    if (-not (Test-Path $p)) { return $null }
-    try {
-        $secure = Get-Content $p -Raw -ErrorAction Stop | ConvertTo-SecureString
-        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-        $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-        return $plain
-    } catch { return $null }
-}
-
-# Check for updates in background (online mode only, best-effort)
+# Check for updates in background (online mode only, best-effort).
+# The repository is public, so no token is needed to check for updates.
 $updateNotice = $null
 if (-not $isWinRE) {
     $versionFile = "$installDir\.version"
@@ -122,13 +102,11 @@ if (-not $isWinRE) {
         $localSha = (Get-Content $versionFile -Raw -ErrorAction SilentlyContinue).Trim()
     }
 
-    $repoToken = Get-StoredToken -Name 'repo'
-    if ($localSha -and $repoToken) {
+    if ($localSha) {
         try {
             $h = @{
-                'Authorization' = ('Bearer ' + $repoToken)
-                'Accept'        = 'application/vnd.github.v3+json'
-                'User-Agent'    = 'SecretTools-Client'
+                'Accept'     = 'application/vnd.github.v3+json'
+                'User-Agent' = 'SecretTools-Client'
             }
             $repoApi = 'https://api.github.com/repos/MrSecret-Official/Secret-Tools-Win'
             $commit = Invoke-RestMethod -Uri "$repoApi/commits/main" -Headers $h -Method Get -TimeoutSec 4 -ErrorAction SilentlyContinue

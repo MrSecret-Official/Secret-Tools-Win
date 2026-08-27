@@ -56,47 +56,9 @@ function Show-Banner {
 }
 
 # -------------------------------------------------------------
-# SECURE CREDENTIAL STORAGE
-# The GitHub token is never written into source. It is requested once
-# interactively (input hidden) and stored DPAPI-encrypted under the
-# current Windows user profile — only this Windows account on this
-# machine can decrypt it.
-# -------------------------------------------------------------
-$credDir = "$env:LOCALAPPDATA\Secret-Tools\Credentials"
-
-function Get-StoredToken {
-    param([string]$Name)
-    $p = "$credDir\$Name.dat"
-    if (-not (Test-Path $p)) { return $null }
-    try {
-        $secure = Get-Content $p -Raw -ErrorAction Stop | ConvertTo-SecureString
-        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-        $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-        return $plain
-    } catch { return $null }
-}
-
-function Set-StoredToken {
-    param([string]$Name, [string]$PromptText)
-    if (-not (Test-Path $credDir)) { New-Item -ItemType Directory -Path $credDir -Force | Out-Null }
-    $secure = Read-Host -Prompt $PromptText -AsSecureString
-    $secure | ConvertFrom-SecureString | Out-File -FilePath "$credDir\$Name.dat" -Force
-}
-
-function Get-OrRequestToken {
-    param([string]$Name, [string]$PromptText)
-    $tok = Get-StoredToken -Name $Name
-    if (-not $tok) {
-        Write-Host "${creamyYellow}[SETUP] No stored GitHub token found for '$Name'.${reset}"
-        Set-StoredToken -Name $Name -PromptText $PromptText
-        $tok = Get-StoredToken -Name $Name
-    }
-    return $tok
-}
-
-# -------------------------------------------------------------
-# STEP 1: INITIALIZE, AUTHENTICATE & CHECK REPOSITORY VERSION
+# STEP 1: INITIALIZE & CHECK REPOSITORY VERSION
+# The repository is public, so no GitHub token or account is needed to
+# install or update — just a plain, unauthenticated API call.
 # -------------------------------------------------------------
 Clear-Host
 Show-Banner
@@ -105,11 +67,9 @@ Write-Host '                              AUTOMATED INSTALLATION WIZARD'
 Write-Host '============================================================================================='
 Write-Host ''
 
-$repoToken = Get-OrRequestToken -Name 'repo' -PromptText 'GitHub PAT with read access to MrSecret-Official/Secret-Tools-Win (hidden)'
 $headers = @{
-    'Authorization' = ('Bearer ' + $repoToken)
-    'Accept'        = 'application/vnd.github.v3+json'
-    'User-Agent'    = 'SecretTools-Installer'
+    'Accept'     = 'application/vnd.github.v3+json'
+    'User-Agent' = 'SecretTools-Installer'
 }
 
 $installDir = "$([Environment]::GetFolderPath('UserProfile'))\Tools"
@@ -135,8 +95,10 @@ try {
 } catch {}
 
 if (-not $remoteSha) {
-    Write-Host "${creamyRed}[WARN] Could not reach GitHub or the stored token was rejected.${reset}"
-    Write-Host "${creamyYellow}       If your token expired, delete '$credDir\repo.dat' and re-run this installer.${reset}"
+    Write-Host "${creamyRed}[WARN] Could not reach GitHub. Check your internet connection.${reset}"
+    Write-Host "${creamyYellow}       Note: GitHub allows a limited number of unauthenticated requests per hour per${reset}"
+    Write-Host "${creamyYellow}       IP address (60/hr); if many people install from the same network in a short${reset}"
+    Write-Host "${creamyYellow}       time, wait a bit and try again.${reset}"
 }
 
 $localSha = ''
